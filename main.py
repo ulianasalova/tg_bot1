@@ -6,10 +6,11 @@ import schedule
 import time
 from telebot import types
 import threading
-
+import os
 
 # Укажите ваш токен бота
-TOKEN = "8018132574:AAHJaoNpXuomSlf93UwbjB9O5KEIP-xiJ7c"
+
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 CHANNEL_ID = "-1002273493973"  # Имя или ID канала
 MESSAGE_TEXT = "Напоминаем о необходимости оплаты подписки! Не забудьте продлить доступ."
 
