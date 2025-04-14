@@ -1,4 +1,5 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from config import Config
 
 def build_reminder_keyboard():
     return InlineKeyboardMarkup([
@@ -30,14 +31,14 @@ def build_user_cancel_button(user_id: int):
 
 def build_admin_panel():
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("📋 Все пользователи", callback_data="admin_view:all")],
+        [InlineKeyboardButton("📋 Все пользователи", callback_data="admin_all_users")],
         [InlineKeyboardButton("✅ Оплатившие", callback_data="admin_view:paid")],
         [InlineKeyboardButton("❌ Не оплатили", callback_data="admin_view:not_paid")],
         [InlineKeyboardButton("🆕 Последние оплаты", callback_data="admin_view:latest")],
         [InlineKeyboardButton("📊 Статистика", callback_data="admin_stats")],
         [InlineKeyboardButton("📥 Экспорт в Excel (CSV)", callback_data="admin_export_csv")]
-    ])
 
+    ])
 
 def build_history_keyboard(user_id: int, status: str):
     buttons = []
@@ -60,4 +61,28 @@ def build_history_keyboard(user_id: int, status: str):
 
     return InlineKeyboardMarkup([buttons])
 
+def build_channel_filter_keyboard():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("👥 Все", callback_data="admin_filter:all")],
+        [InlineKeyboardButton("🏊 Masters", callback_data="admin_filter:swimmasters")],
+        [InlineKeyboardButton("👙 Amateur", callback_data="admin_filter:amateur")],
+    ])
 
+# меню пользователя
+def build_main_menu():
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🧾 Выбрать канал", callback_data="choose_channel")],
+        [InlineKeyboardButton("ℹ️ Информация о каналах", callback_data="channel_info")],
+        [InlineKeyboardButton("💳 Оплатить", callback_data="pay")],
+        [InlineKeyboardButton("📄 Моя подписка", callback_data="my_subscription")],
+        [InlineKeyboardButton("✉️ Написать админу", url="https://t.me/Babikhin_Artem")] # Заменить имя админа!!!
+    ])
+
+def build_channel_keyboard():
+    buttons = []
+
+    for key, channel in Config.CHANNELS.items():
+        text = channel["title"]
+        buttons.append([InlineKeyboardButton(text, callback_data=f"set_channel:{key}")])
+
+    return InlineKeyboardMarkup(buttons)

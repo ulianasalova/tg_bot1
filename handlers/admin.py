@@ -1,42 +1,65 @@
-from telegram import Update
 from telegram.ext import ContextTypes, CommandHandler
 from db import get_unpaid_users
 from keyboards.main import build_user_confirm_button
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from config import Config
 from utils.storage import save_invite_message_id
 from db import get_all_users
 from utils.storage import load_invite_message_id
-from keyboards.main import build_history_keyboard
-from keyboards.main import build_admin_panel
+from keyboards.main import build_history_keyboard, build_admin_panel
+from utils.formatting import format_user_card
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes
+from config import Config
+from db import save_invite_message_id  # если используется
 
 async def invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != Config.ADMIN_CHAT_ID:
+    if update.effective_user.id not in Config.ADMIN_CHAT_IDS:
         await update.message.reply_text("⛔ Только для администратора.")
         return
 
-    bot_link = f"https://t.me/{context.bot.username}"
+    bot_username = context.bot.username
+    success_channels = []
 
-    keyboard = InlineKeyboardMarkup([
-        [InlineKeyboardButton("🤖 Подписаться на бота", url=bot_link)]
-    ])
+    for key, channel in Config.CHANNELS.items():
+        start_link = f"https://t.me/{bot_username}?start={key}"
 
-    msg = await context.bot.send_message(
-        chat_id=Config.CHANNEL_ID,
-        text=(
-            "🏊‍♂️ Привет, друзья!\n"
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🤖 Подписаться на бота", url=start_link)]
+        ])
+
+        text = (
+            f"🏊‍♂️ Привет, друзья!\n"
+            f"Вы находитесь в канале <b>{channel['title']}</b>\n\n"
             "Чтобы не пропустить оплату за тренировку — подпишитесь на нашего бота 📩\n\n"
             "Он будет мягко и вовремя напоминать вам об оплате 💳"
-        ),
-        reply_markup=keyboard
-    )
+        )
 
-    save_invite_message_id(msg.message_id)
+        try:
+            msg = await context.bot.send_message(
+                chat_id=channel["id"],
+                text=text,
+                reply_markup=keyboard,
+                parse_mode="HTML"
+            )
+            # Сохраняем ID приглашения, если нужно
+            # save_invite_message_id(key, msg.message_id)
+            success_channels.append(channel["title"])
+        except Exception as e:
+            print(f"❌ Не удалось отправить сообщение в канал {channel['title']}: {e}")
 
-    await update.message.reply_text("✅ Приглашение отправлено в канал!")
+    if success_channels:
+        await update.message.reply_text(f"✅ Приглашение отправлено в:\n" + "\n".join(success_channels))
+    else:
+        await update.message.reply_text("⚠️ Не удалось отправить ни одного приглашения.")
+
+
+        # Сохраняем message_id для команды /pin_invite
+        save_invite_message_id(key, msg.message_id)
+
+    await update.message.reply_text("✅ Приглашения успешно отправлены во все каналы!")
+
 
 async def pin_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != Config.ADMIN_CHAT_ID:
+    if update.effective_user.id not in Config.ADMIN_CHAT_IDS:
         await update.message.reply_text("⛔ Только для администратора.")
         return
 
@@ -50,7 +73,7 @@ async def pin_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != Config.ADMIN_CHAT_ID:
+    if update.effective_user.id not in Config.ADMIN_CHAT_IDS:
         await update.message.reply_text("⛔ Только для администратора.")
         return
 
@@ -73,7 +96,7 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"✅ Сообщение отправлено {count} пользователям.")
 
 async def list_unpaid(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != Config.ADMIN_CHAT_ID:
+    if update.effective_user.id not in Config.ADMIN_CHAT_IDS:
         await update.message.reply_text("⛔ Команда только для администратора")
         return
 
@@ -96,7 +119,7 @@ from db import get_all_users
 from keyboards.main import build_user_cancel_button
 
 async def list_paid(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != Config.ADMIN_CHAT_ID:
+    if update.effective_user.id not in Config.ADMIN_CHAT_IDS:
         await update.message.reply_text("⛔ Только для администратора.")
         return
 
@@ -119,77 +142,152 @@ async def list_paid(update: Update, context: ContextTypes.DEFAULT_TYPE):
             text=f"👤 {name} {username}\n📅 Оплата: {payment_date}",
             reply_markup=build_user_cancel_button(user_id)
         )
+PAGE_SIZE = 10  # количество карточек на одной странице
 
 async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != Config.ADMIN_CHAT_ID:
-        message = update.message or update.callback_query.message
+    message = update.message or update.callback_query.message
+
+    if update.effective_user.id not in Config.ADMIN_CHAT_IDS:
         await message.reply_text("⛔ Только для администратора.")
         return
 
+    # Получаем параметры
     query = " ".join(context.args).lower() if context.args else ""
-
     users = get_all_users()
 
-    # Фильтрация и сортировка
-    if query:
-        filters = query.split()
-        search_term = None
-        status_filter = None
-        sort_latest = False
+    # Фильтрация
+    filters = query.split()
+    search_term = None
+    status_filter = None
+    sort_latest = False
+    channel_filter = None
 
-        for f in filters:
-            if f.startswith("only="):
-                status_filter = f.split("=")[1]
-            elif f.startswith("sort=") and f.split("=")[1] == "latest":
-                sort_latest = True
-            else:
-                search_term = f
+    for f in filters:
+        if f.startswith("only="):
+            status_filter = f.split("=")[1]
+        elif f.startswith("sort=") and f.split("=")[1] == "latest":
+            sort_latest = True
+        elif f.startswith("channel="):
+            channel_filter = f.split("=")[1]
+        else:
+            search_term = f
 
-        if search_term:
-            users = [
-                u for u in users if search_term in (u[1].lower() + " " + str(u[0]))
-            ]
-
-        if status_filter:
-            users = [u for u in users if u[2] == status_filter]
-
-        if sort_latest:
-            users.sort(key=lambda x: x[3] or "", reverse=True)  # по дате оплаты
+    if search_term:
+        users = [u for u in users if search_term in (u[1].lower() + " " + str(u[0]))]
+    if status_filter:
+        users = [u for u in users if u[2] == status_filter]
+    if channel_filter:
+        users = [u for u in users if u[5] == channel_filter]
+    if sort_latest:
+        users.sort(key=lambda x: x[3] or "", reverse=True)
     else:
-        users.sort(key=lambda x: x[1])  # по имени
-
-    message = update.message or update.callback_query.message
+        users.sort(key=lambda x: x[1])
 
     if not users:
         await message.reply_text("⚠️ Подходящих пользователей не найдено.")
         return
 
-    for user in users:
-        user_id, name, status, payment_date, previous_payment_date, next_reminder_date = user
+    # Сохраняем state
+    context.user_data["history_state"] = {
+        "users": users,
+        "page": 0,
+        "query": query,
+    }
 
+    await send_history_page(message, context)
+
+    # --- Вывод заголовка, если фильтруем по каналу ---
+    if channel_filter:
+        channel_info = Config.CHANNELS.get(channel_filter)
+        title = channel_info["title"] if channel_info else channel_filter.capitalize()
+        await message.reply_text(f"📋 Пользователи канала <b>{title}</b> ({len(users)} чел.)", parse_mode="HTML")
+    elif query:
+        await message.reply_text(f"📋 Найдено пользователей: <b>{len(users)}</b>", parse_mode="HTML")
+
+    # --- Вывод карточек пользователей ---
+    for user in users:
+        user_id, name, status, payment_date, previous_date, channel_key, username = user
+
+        # Получаем username, если возможно
         try:
             tg_user = await context.bot.get_chat(user_id)
-            username = f"@{tg_user.username}" if tg_user.username else "(без username)"
+            username = tg_user.username
         except:
-            username = "(недоступен)"
+            username = None
 
-        status_text = "✅ Оплачено" if status == "paid" else "❌ Не оплачено"
-        date_text = f"📅 Оплата: {payment_date}" if payment_date else "📅 Оплата: —"
+        text = format_user_card(
+            user_id=user_id,
+            name=name,
+            status=status,
+            payment_date=payment_date,
+            previous_date=previous_date,
+            channel_key=channel_key,
+            username=username
+        )
 
         await message.reply_text(
-            text=(
-                f"👤 {name} {username}\n"
-                f"🆔 ID: <code>{user_id}</code>\n"
-                f"{date_text}\n"
-                f"💳 Статус: {status_text}"
-            ),
-            parse_mode="HTML",
-            reply_markup=build_history_keyboard(user_id, status)
+            text=text,
+            reply_markup=build_history_keyboard(user_id, status),
+            parse_mode="HTML"
+        )
+async def send_history_page(message, context):
+    state = context.user_data.get("history_state")
+    if not state:
+        await message.reply_text("⚠️ Данные не найдены.")
+        return
+
+    users = state["users"]
+    page = state["page"]
+    start = page * PAGE_SIZE
+    end = start + PAGE_SIZE
+    page_users = users[start:end]
+
+    if not page_users:
+        await message.reply_text("📭 Нет данных для этой страницы.")
+        return
+
+    total_pages = (len(users) - 1) // PAGE_SIZE + 1
+
+    for user in page_users:
+        user_id, name, status, payment_date, previous_date, channel_key, username = user
+        try:
+            tg_user = await context.bot.get_chat(user_id)
+            username = tg_user.username or username
+        except:
+            pass
+
+        text = format_user_card(
+            user_id=user_id,
+            name=name,
+            status=status,
+            payment_date=payment_date,
+            previous_date=previous_date,
+            channel_key=channel_key,
+            username=username
+        )
+
+        await message.reply_text(
+            text=text,
+            reply_markup=build_history_keyboard(user_id, status),
+            parse_mode="HTML"
+        )
+
+    # Кнопки листания
+    buttons = []
+    if page > 0:
+        buttons.append(InlineKeyboardButton("⬅ Назад", callback_data="history_page:prev"))
+    if end < len(users):
+        buttons.append(InlineKeyboardButton("Вперёд ➡", callback_data="history_page:next"))
+
+    if buttons:
+        await message.reply_text(
+            f"📄 Страница {page + 1} из {total_pages}",
+            reply_markup=InlineKeyboardMarkup([buttons])
         )
 
 
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != Config.ADMIN_CHAT_ID:
+    if update.effective_user.id not in Config.ADMIN_CHAT_IDS:
         await update.message.reply_text("⛔ Только для администратора.")
         return
 
@@ -198,7 +296,7 @@ async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 from db import get_user_payment_log
 
 async def user_log(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != Config.ADMIN_CHAT_ID:
+    if update.effective_user.id not in Config.ADMIN_CHAT_IDS:
         await update.message.reply_text("⛔ Только для администратора.")
         return
 
@@ -231,15 +329,23 @@ async def user_log(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(text)
 
+async def update_pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.effective_user.id not in Config.ADMIN_CHAT_IDS:
+        return await update.message.reply_text("⛔ Только для администратора.")
+
+    await update.message.reply_text(
+        "📝 Введите имя или username пользователя, которому нужно изменить дату последней оплаты:"
+    )
+    return ConversationHandler.WAITING_FOR_NAME
+
 
 def get_admin_handlers():
     return [
         CommandHandler("list_unpaid", list_unpaid),
         CommandHandler("invite", invite),
         CommandHandler("pin_invite", pin_invite),
-        CommandHandler("broadcast", broadcast),
+        CommandHandler("broadcastbroadcast", broadcast),
         CommandHandler("list_paid", list_paid),
         CommandHandler("history", history),
         CommandHandler("admin", admin_panel),
-        CommandHandler("log", user_log),
     ]

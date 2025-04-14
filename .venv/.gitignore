@@ -1,7 +1,33 @@
-# Игнорируем виртуальное окружение
-venv/
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*.pyo
+*.pyd
 
-# Игнорируем файл с секретами
+# Виртуальные окружения
+.venv/
+env/
+venv/
+ENV/
+
+# Файлы базы данных
+*.db
+*.sqlite
+*.sqlite3
+
+# Переменные окружения
 .env
+
+# Логи и временные файлы
+*.log
+*.tmp
+*.bak
+
+# Конфигурации PyCharm
+.idea/
+
+# Кэш pip
+pip-wheel-metadata/
+*.egg-info/
+dist/
+build/
