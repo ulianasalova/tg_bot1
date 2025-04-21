@@ -3,3 +3,4 @@ apscheduler==3.10.4
 httpx==0.25.2
 nest_asyncio==1.6.0
 python-dotenv==1.0.1
+pytz==2023.3.post1
