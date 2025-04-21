@@ -1,3 +1,10 @@
-﻿id,name,payment_status,payment_date,previous_payment_date,next_reminder_date
-1088678872,Уᴧьянᴀ Сᴀᴧᴏʙᴀ,not_paid,,,2025-04-07T17:31:30.444885
-6866615870,Светлана,not_paid,,,2025-04-08T12:04:01.095489
+﻿id,name,payment_status,payment_date,previous_payment_date,channel,username
+1088678872,Уᴧьянᴀ Сᴀᴧᴏʙᴀ,paid,2025-04-19,,swimmasters,
+1088678872,Уᴧьянᴀ Сᴀᴧᴏʙᴀ,paid,2025-04-19,,open_water,
+1088678872,Уᴧьянᴀ Сᴀᴧᴏʙᴀ,paid,2025-04-19,2025-04-19,gym,
+1088678872,Уᴧьянᴀ Сᴀᴧᴏʙᴀ,paid,2025-04-19,,functional,
+1088678872,Уᴧьянᴀ Сᴀᴧᴏʙᴀ,paid,2025-04-19,2025-04-19,amateur,
+6866615870,Светлана,paid,2025-04-20,,functional,
+6866615870,Светлана,paid,2025-04-13,,swimmasters,
+6866615870,Светлана,not_paid,2025-04-20,,open_water,
+6866615870,Светлана,not_paid,2025-04-20,,gym,

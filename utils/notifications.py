@@ -1,7 +1,5 @@
-from config import Config
-
-async def notify_admins(bot, text, parse_mode=None):
-    for admin_id in Config.ADMIN_CHAT_IDS:
+async def notify_admins(bot, text, admin_ids, parse_mode=None):
+    for admin_id in admin_ids:
         try:
             await bot.send_message(chat_id=admin_id, text=text, parse_mode=parse_mode)
         except Exception as e:

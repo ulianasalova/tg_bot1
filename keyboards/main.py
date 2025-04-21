@@ -8,14 +8,22 @@ def build_reminder_keyboard():
         [InlineKeyboardButton("⏰ Напомнить позже", callback_data="remind_later")],
     ])
 
-def build_paid_button():
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+
+def build_paid_button(channel_key=None):
+    callback_data = "paid"
+    if channel_key:
+        callback_data = f"paid:{channel_key}"
+
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Я оплатил", callback_data="paid")]
+        [InlineKeyboardButton("✅ Я оплатил", callback_data=callback_data)],
+        [InlineKeyboardButton("🏠 Главное меню", callback_data="main_menu")]
     ])
 
-def build_user_confirm_button(user_id: int):
+
+def build_user_confirm_button(user_id: int, channel_key: str):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Подтвердить оплату", callback_data=f"admin_confirm:{user_id}")]
+        [InlineKeyboardButton("✅ Подтвердить оплату", callback_data=f"admin_confirm:{user_id}:{channel_key}")]
     ])
 
 def build_comeback_keyboard():
@@ -32,28 +40,57 @@ def build_user_cancel_button(user_id: int):
 def build_admin_panel():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("📋 Все пользователи", callback_data="admin_all_users")],
+        [InlineKeyboardButton("‼️ Оплаты на подтверждение", callback_data="admin_view:to_confirm")],  # ← добавили
         [InlineKeyboardButton("✅ Оплатившие", callback_data="admin_view:paid")],
         [InlineKeyboardButton("❌ Не оплатили", callback_data="admin_view:not_paid")],
-        [InlineKeyboardButton("🆕 Последние оплаты", callback_data="admin_view:latest")],
+        [InlineKeyboardButton("🆕 Новые подписчики", callback_data="admin_view:latest")],
         [InlineKeyboardButton("📊 Статистика", callback_data="admin_stats")],
         [InlineKeyboardButton("📥 Экспорт в Excel (CSV)", callback_data="admin_export_csv")]
-
     ])
 
-def build_history_keyboard(user_id: int, status: str):
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+from db import get_admin_channels
+from config import Config
+
+def build_channel_filter_keyboard(admin_id: int):
+    channels = get_admin_channels(admin_id)  # Получаем список ключей каналов
+
+    keyboard = []
+
+    # 👥 Кнопка для всех каналов админа
+    keyboard.append([InlineKeyboardButton("👥 Все", callback_data="admin_filter:all")])
+
+    # 🏷 Кнопки по каждому каналу админа
+    for key in channels:
+        info = Config.CHANNELS.get(key)
+        title = info["title"] if info else key.capitalize()
+        keyboard.append([InlineKeyboardButton(title, callback_data=f"admin_filter:{key}")])
+
+    return InlineKeyboardMarkup(keyboard)
+
+
+def build_history_keyboard(user_id: int, status: str, channel_key: str, payment_date=None):
+    from db import is_payment_confirmed
+
     buttons = []
+    payment_confirmed = is_payment_confirmed(user_id, channel_key)
 
     if status == "paid":
+        if not payment_confirmed:
+            buttons.append(
+                InlineKeyboardButton("✅ Подтвердить", callback_data=f"admin_confirm:{user_id}:{channel_key}")
+            )
         buttons.append(
-            InlineKeyboardButton("↩ Отменить оплату", callback_data=f"admin_cancel:{user_id}")
+            InlineKeyboardButton("↩ Отменить", callback_data=f"admin_cancel:{user_id}:{channel_key}")
         )
-        buttons.append(
-            InlineKeyboardButton("✅ Подтвердить заново", callback_data=f"admin_confirm:{user_id}")
-        )
-    else:
-        buttons.append(
-            InlineKeyboardButton("✅ Подтвердить оплату", callback_data=f"admin_confirm:{user_id}")
-        )
+
+    elif status == "not_paid":
+        # 👇 Добавим кнопку подтверждения для новых пользователей (без даты оплаты)
+        if payment_date is None:
+            buttons.append(
+                InlineKeyboardButton("✅ Подтвердить оплату", callback_data=f"admin_confirm:{user_id}:{channel_key}")
+            )
 
     buttons.append(
         InlineKeyboardButton("📜 История", callback_data=f"user_log:{user_id}")
@@ -61,22 +98,18 @@ def build_history_keyboard(user_id: int, status: str):
 
     return InlineKeyboardMarkup([buttons])
 
-def build_channel_filter_keyboard():
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("👥 Все", callback_data="admin_filter:all")],
-        [InlineKeyboardButton("🏊 Masters", callback_data="admin_filter:swimmasters")],
-        [InlineKeyboardButton("👙 Amateur", callback_data="admin_filter:amateur")],
-    ])
+
 
 # меню пользователя
 def build_main_menu():
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🧾 Выбрать канал", callback_data="choose_channel")],
-        [InlineKeyboardButton("ℹ️ Информация о каналах", callback_data="channel_info")],
-        [InlineKeyboardButton("💳 Оплатить", callback_data="pay")],
+        [InlineKeyboardButton("💳 Оплатить подписку", callback_data="pay")],
         [InlineKeyboardButton("📄 Моя подписка", callback_data="my_subscription")],
-        [InlineKeyboardButton("✉️ Написать админу", url="https://t.me/Babikhin_Artem")] # Заменить имя админа!!!
+        [InlineKeyboardButton("ℹ️ Информация", callback_data="channel_info")],
+        [InlineKeyboardButton("✉️ Поддержка", url="https://t.me/Babikhin_Artem")],
     ])
+
 
 def build_channel_keyboard():
     buttons = []
@@ -86,3 +119,13 @@ def build_channel_keyboard():
         buttons.append([InlineKeyboardButton(text, callback_data=f"set_channel:{key}")])
 
     return InlineKeyboardMarkup(buttons)
+
+from telegram import ReplyKeyboardMarkup, KeyboardButton
+
+def build_admin_reply_keyboard():
+    return ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton("/admin")]],
+        resize_keyboard=True,
+        one_time_keyboard=False
+    )
+

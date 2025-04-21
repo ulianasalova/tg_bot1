@@ -1,18 +1,15 @@
 from telegram.ext import ContextTypes, CommandHandler
-from db import get_unpaid_users
-from keyboards.main import build_user_confirm_button
-from utils.storage import save_invite_message_id
-from db import get_all_users
-from utils.storage import load_invite_message_id
-from keyboards.main import build_history_keyboard, build_admin_panel
-from utils.formatting import format_user_card
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import ContextTypes
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
 from config import Config
-from db import save_invite_message_id  # если используется
+from utils.pagination import send_paid_users_page, send_unpaid_users_page
+from db import get_paid_users_for_admin
+from telegram import Update
+from telegram.ext import ContextTypes
+from db import get_unpaid_users_with_channels, is_admin
+
 
 async def invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in Config.ADMIN_CHAT_IDS:
+    if not is_admin(update.effective_user.id):
         await update.message.reply_text("⛔ Только для администратора.")
         return
 
@@ -40,40 +37,26 @@ async def invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 reply_markup=keyboard,
                 parse_mode="HTML"
             )
-            # Сохраняем ID приглашения, если нужно
-            # save_invite_message_id(key, msg.message_id)
+
+            # Пытаемся закрепить сообщение
+            try:
+                await context.bot.pin_chat_message(chat_id=channel["id"], message_id=msg.message_id)
+            except Exception as pin_err:
+                print(f"⚠️ Не удалось закрепить сообщение в {channel['title']}: {pin_err}")
+
             success_channels.append(channel["title"])
+
         except Exception as e:
             print(f"❌ Не удалось отправить сообщение в канал {channel['title']}: {e}")
 
     if success_channels:
-        await update.message.reply_text(f"✅ Приглашение отправлено в:\n" + "\n".join(success_channels))
+        await update.message.reply_text(f"✅ Приглашение отправлено и закреплено в:\n" + "\n".join(success_channels))
     else:
         await update.message.reply_text("⚠️ Не удалось отправить ни одного приглашения.")
 
-
-        # Сохраняем message_id для команды /pin_invite
-        save_invite_message_id(key, msg.message_id)
-
-    await update.message.reply_text("✅ Приглашения успешно отправлены во все каналы!")
-
-
-async def pin_invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in Config.ADMIN_CHAT_IDS:
-        await update.message.reply_text("⛔ Только для администратора.")
-        return
-
-    msg_id = load_invite_message_id()
-    if not msg_id:
-        await update.message.reply_text("⚠️ Нет сохранённого приглашения. Сначала вызови /invite.")
-        return
-
-    await context.bot.pin_chat_message(chat_id=Config.CHANNEL_ID, message_id=msg_id)
-    await update.message.reply_text("📌 Сообщение закреплено в канале.")
-
-
 async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in Config.ADMIN_CHAT_IDS:
+    admin_id = update.effective_user.id
+    if not is_admin(admin_id):
         await update.message.reply_text("⛔ Только для администратора.")
         return
 
@@ -82,11 +65,17 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     message = " ".join(context.args)
-    users = get_all_users()
-    count = 0
 
-    for user in users:
-        user_id = user[0]
+    # Получаем список каналов, за которые отвечает админ
+    from db import get_admin_channels
+    admin_channels = get_admin_channels(admin_id)
+
+    # Получаем пользователей этих каналов
+    from db import get_users_by_channels
+    users = get_users_by_channels(admin_channels)
+
+    count = 0
+    for user_id, name in users:
         try:
             await context.bot.send_message(chat_id=user_id, text=message)
             count += 1
@@ -95,67 +84,123 @@ async def broadcast(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(f"✅ Сообщение отправлено {count} пользователям.")
 
+
 async def list_unpaid(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in Config.ADMIN_CHAT_IDS:
+    if not is_admin(update.effective_user.id):
         await update.message.reply_text("⛔ Команда только для администратора")
         return
 
-    users = get_unpaid_users()
-    if not users:
+    raw_users = get_unpaid_users_with_channels()
+
+    if not raw_users:
         await update.message.reply_text("🎉 Все пользователи оплатили.")
         return
 
-    for user_id, name in users:
-        await update.message.reply_text(
-            text=f"👤 {name} (ID: {user_id})",
-            reply_markup=build_user_confirm_button(user_id)
-        )
+    # (user_id, name, channel_key) → теперь добавим username для вывода карточек
+    users = []
+    for user_id, name, channel_key in raw_users:
+        try:
+            chat = await context.bot.get_chat(user_id)
+            username = chat.username
+        except:
+            username = None
+        users.append((user_id, name, username, channel_key))
 
-from utils.scheduler import send_reminders  # не забудь импортировать
+    # сохраняем в context
+    context.user_data["unpaid_list"] = {
+        "users": users,
+        "page": 0,
+    }
 
-from db import get_unpaid_users
+    await send_unpaid_users_page(update.message, context)
 
-from db import get_all_users
-from keyboards.main import build_user_cancel_button
 
 async def list_paid(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in Config.ADMIN_CHAT_IDS:
+    admin_id = update.effective_user.id
+    if not is_admin(admin_id):
         await update.message.reply_text("⛔ Только для администратора.")
         return
 
-    users = get_all_users()
-    paid_users = [u for u in users if u[2] == "paid"]
+    # Получаем пользователей с оплатой
+    paid_users = get_paid_users_for_admin(admin_id)
 
     if not paid_users:
         await update.message.reply_text("❗ Оплаченных пользователей пока нет.")
         return
 
-    for user in paid_users:
-        user_id, name, status, payment_date, previous_payment_date, next_reminder_date = user
-        try:
-            user_chat = await context.bot.get_chat(user_id)
-            username = f"@{user_chat.username}" if user_chat.username else "(без username)"
-        except:
-            username = "(недоступен)"
+    # Сохраняем состояние в user_data
+    context.user_data["paid_list"] = {
+        "users": paid_users,
+        "page": 0
+    }
 
-        await update.message.reply_text(
-            text=f"👤 {name} {username}\n📅 Оплата: {payment_date}",
-            reply_markup=build_user_cancel_button(user_id)
+    # Показываем первую страницу
+    await send_paid_users_page(update.message, context)
+
+from utils.formatting import format_user_card
+from utils.pagination import build_pagination_keyboard
+from keyboards.main import build_history_keyboard
+
+PAGE_SIZE = 10
+
+async def send_history_page(message, context):
+    state = context.user_data.get("history_state")
+    if not state:
+        await message.reply_text("❌ Нет данных для отображения.")
+        return
+
+    page = state["page"]
+    users = state["users"]
+    start = page * PAGE_SIZE
+    end = start + PAGE_SIZE
+    current_users = users[start:end]
+
+    if not current_users:
+        await message.reply_text("⚠️ Нет данных на этой странице.")
+        return
+
+    for user in current_users:
+        user_id, name, status, payment_date, previous_date, channel_key, username = user
+        text = format_user_card(
+            user_id=user_id,
+            name=name,
+            status=status,
+            payment_date=payment_date,
+            previous_date=previous_date,
+            channel_key=channel_key,
+            username=username
         )
-PAGE_SIZE = 10  # количество карточек на одной странице
+        await message.reply_text(
+            text=text,
+            reply_markup=build_history_keyboard(user_id, status, channel_key, payment_date),
+            parse_mode="HTML"
+        )
+
+    # ➕ Пагинация
+    keyboard = build_pagination_keyboard(
+        page=page,
+        total=len(users),
+        prefix="history_page",
+        page_size=PAGE_SIZE
+    )
+
+    if keyboard:
+        await message.reply_text("📄 Навигация по страницам:", reply_markup=keyboard)
+
 
 async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    from db import get_all_users_with_channels
+    from utils.formatting import format_user_card
     message = update.message or update.callback_query.message
 
-    if update.effective_user.id not in Config.ADMIN_CHAT_IDS:
+    if not is_admin(update.effective_user.id):
         await message.reply_text("⛔ Только для администратора.")
         return
 
-    # Получаем параметры
     query = " ".join(context.args).lower() if context.args else ""
-    users = get_all_users()
+    users = get_all_users_with_channels()
 
-    # Фильтрация
+    # --- Фильтрация ---
     filters = query.split()
     search_term = None
     status_filter = None
@@ -172,31 +217,46 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             search_term = f
 
+    # 🔍 Поиск по имени/ID
     if search_term:
-        users = [u for u in users if search_term in (u[1].lower() + " " + str(u[0]))]
-    if status_filter:
-        users = [u for u in users if u[2] == status_filter]
+        users = [
+            u for u in users
+            if search_term in (u["name"].lower() + " " + str(u["user_id"]))
+        ]
+
+    # 🎯 Специальная фильтрация по статусу
+    if status_filter == "new_users":
+        users = [
+            u for u in users
+            if u["payment_status"] == "not_paid" and u["payment_date"] is None
+        ]
+    elif status_filter:
+        users = [u for u in users if u["payment_status"] == status_filter]
+
+    # 🎯 Фильтр по каналу
     if channel_filter:
-        users = [u for u in users if u[5] == channel_filter]
+        users = [u for u in users if u["channel_key"] == channel_filter]
+
+    # 📅 Сортировка
     if sort_latest:
-        users.sort(key=lambda x: x[3] or "", reverse=True)
+        users.sort(key=lambda x: x["payment_date"] or "", reverse=True)
     else:
-        users.sort(key=lambda x: x[1])
+        users.sort(key=lambda x: x["name"])
 
     if not users:
         await message.reply_text("⚠️ Подходящих пользователей не найдено.")
         return
 
-    # Сохраняем state
     context.user_data["history_state"] = {
         "users": users,
         "page": 0,
         "query": query,
     }
 
+    from utils.pagination import send_history_page
     await send_history_page(message, context)
 
-    # --- Вывод заголовка, если фильтруем по каналу ---
+    # 🔰 Заголовок
     if channel_filter:
         channel_info = Config.CHANNELS.get(channel_filter)
         title = channel_info["title"] if channel_info else channel_filter.capitalize()
@@ -204,147 +264,44 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
     elif query:
         await message.reply_text(f"📋 Найдено пользователей: <b>{len(users)}</b>", parse_mode="HTML")
 
-    # --- Вывод карточек пользователей ---
-    for user in users:
-        user_id, name, status, payment_date, previous_date, channel_key, username = user
 
-        # Получаем username, если возможно
-        try:
-            tg_user = await context.bot.get_chat(user_id)
-            username = tg_user.username
-        except:
-            username = None
-
-        text = format_user_card(
-            user_id=user_id,
-            name=name,
-            status=status,
-            payment_date=payment_date,
-            previous_date=previous_date,
-            channel_key=channel_key,
-            username=username
-        )
-
-        await message.reply_text(
-            text=text,
-            reply_markup=build_history_keyboard(user_id, status),
-            parse_mode="HTML"
-        )
-async def send_history_page(message, context):
-    state = context.user_data.get("history_state")
-    if not state:
-        await message.reply_text("⚠️ Данные не найдены.")
-        return
-
-    users = state["users"]
-    page = state["page"]
-    start = page * PAGE_SIZE
-    end = start + PAGE_SIZE
-    page_users = users[start:end]
-
-    if not page_users:
-        await message.reply_text("📭 Нет данных для этой страницы.")
-        return
-
-    total_pages = (len(users) - 1) // PAGE_SIZE + 1
-
-    for user in page_users:
-        user_id, name, status, payment_date, previous_date, channel_key, username = user
-        try:
-            tg_user = await context.bot.get_chat(user_id)
-            username = tg_user.username or username
-        except:
-            pass
-
-        text = format_user_card(
-            user_id=user_id,
-            name=name,
-            status=status,
-            payment_date=payment_date,
-            previous_date=previous_date,
-            channel_key=channel_key,
-            username=username
-        )
-
-        await message.reply_text(
-            text=text,
-            reply_markup=build_history_keyboard(user_id, status),
-            parse_mode="HTML"
-        )
-
-    # Кнопки листания
-    buttons = []
-    if page > 0:
-        buttons.append(InlineKeyboardButton("⬅ Назад", callback_data="history_page:prev"))
-    if end < len(users):
-        buttons.append(InlineKeyboardButton("Вперёд ➡", callback_data="history_page:next"))
-
-    if buttons:
-        await message.reply_text(
-            f"📄 Страница {page + 1} из {total_pages}",
-            reply_markup=InlineKeyboardMarkup([buttons])
-        )
-
+from keyboards.main import build_admin_panel, build_admin_reply_keyboard
 
 async def admin_panel(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in Config.ADMIN_CHAT_IDS:
+    if not is_admin(update.effective_user.id):
         await update.message.reply_text("⛔ Только для администратора.")
         return
 
-    await update.message.reply_text("🛠 Панель администратора", reply_markup=build_admin_panel())
+    # Покажем reply-клавиатуру с кнопкой /admin
+    await update.message.reply_text(
+        "🛠 Панель администратора",
+        reply_markup=build_admin_reply_keyboard()
+    )
 
-from db import get_user_payment_log
-
-async def user_log(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in Config.ADMIN_CHAT_IDS:
-        await update.message.reply_text("⛔ Только для администратора.")
-        return
-
-    if not context.args:
-        await update.message.reply_text("❗ Использование: /log <user_id>")
-        return
-
-    try:
-        user_id = int(context.args[0])
-    except ValueError:
-        await update.message.reply_text("⚠️ user_id должен быть числом.")
-        return
-
-    logs = get_user_payment_log(user_id)
-
-    if not logs:
-        await update.message.reply_text("ℹ️ История для этого пользователя пуста.")
-        return
-
-    text = f"📜 История пользователя {user_id}:\n\n"
-    for log in logs:
-        date_logged, action, old_date, new_date, by_admin = log
-
-        if action == "confirmed":
-            text += f"🟢 {date_logged[:10]} — подтверждена оплата (новая: {new_date})\n"
-        elif action == "cancelled":
-            text += f"🔴 {date_logged[:10]} — отмена оплаты (старая: {old_date})\n"
-        else:
-            text += f"⚙️ {date_logged[:10]} — действие: {action}\n"
-
-    await update.message.reply_text(text)
+    # Отдельным сообщением — inline-кнопки
+    await update.message.reply_text(
+        "Выберите действие:",
+        reply_markup=build_admin_panel()
+    )
+WAITING_FOR_NAME, WAITING_FOR_DATE = range(2)
 
 async def update_pay_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id not in Config.ADMIN_CHAT_IDS:
+    from db import is_admin  # или импорт заранее, если ещё не сделан
+
+    if not is_admin(update.effective_user.id):
         return await update.message.reply_text("⛔ Только для администратора.")
 
     await update.message.reply_text(
         "📝 Введите имя или username пользователя, которому нужно изменить дату последней оплаты:"
     )
-    return ConversationHandler.WAITING_FOR_NAME
+    return WAITING_FOR_NAME
 
 
 def get_admin_handlers():
     return [
         CommandHandler("list_unpaid", list_unpaid),
         CommandHandler("invite", invite),
-        CommandHandler("pin_invite", pin_invite),
-        CommandHandler("broadcastbroadcast", broadcast),
+        CommandHandler("broadcast", broadcast),
         CommandHandler("list_paid", list_paid),
         CommandHandler("history", history),
         CommandHandler("admin", admin_panel),
