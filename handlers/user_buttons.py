@@ -231,7 +231,8 @@ async def show_payment_details(query, context, user, channel_key):
     for admin_id in admin_ids:
         admin = get_admin_by_id(admin_id)
         if admin and not admin["is_superadmin"] and admin.get("payment_details"):
-            payment_text = f"💳 Реквизиты для оплаты:\n\n{admin['payment_details'].replace('\\n', '\n')}"
+            clean_details = admin["payment_details"].replace("\\n", "\n")
+            payment_text = f"💳 Реквизиты для оплаты:\n\n{clean_details}"
             found = True
             break
 
