@@ -1,5 +1,6 @@
 # Python
 __pycache__/
+**/__pycache__/
 *.py[cod]
 *.pyo
 *.pyd
@@ -22,12 +23,19 @@ ENV/
 *.log
 *.tmp
 *.bak
+*.csv
 
-# Конфигурации PyCharm
+# Конфигурации IDE
 .idea/
+.vscode/
 
-# Кэш pip
+# Кэш
 pip-wheel-metadata/
 *.egg-info/
 dist/
 build/
+.mypy_cache/
+.pytest_cache/
+
+# Mac OS
+.DS_Store
