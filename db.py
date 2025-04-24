@@ -75,7 +75,7 @@ def init_db():
     """)
     from config import Config
 
-    Проверка: есть ли уже записи в таблице каналов
+    # Проверка: есть ли уже записи в таблице каналов
     c.execute("SELECT COUNT(*) FROM channels")
     if c.fetchone()[0] == 0:
         for key, data in fetch_channels().items()
