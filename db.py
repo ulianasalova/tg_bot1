@@ -78,8 +78,7 @@ def init_db():
     # Проверка: есть ли уже записи в таблице каналов
     c.execute("SELECT COUNT(*) FROM channels")
     if c.fetchone()[0] == 0:
-        for key, data in fetch_channels().items()
-:
+        for key, data in fetch_channels().items():
             c.execute("""
                 INSERT INTO channels (key, title, description, tg_id)
                 VALUES (?, ?, ?, ?)
