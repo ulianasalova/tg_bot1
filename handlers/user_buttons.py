@@ -160,7 +160,7 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     elif data in ("info", "channel_info"):
         text = "\n\n".join([
-            f"<b>{c['title']}</b>\n{c['description']}"
+            f"<b>{c['title']}</b>\n{c['description']}\n\n<i>Оплата за месячную подписку на любой из каналов <b>1500 рублей</b></i>"
             for c in Config.CHANNELS.values()
         ])
 

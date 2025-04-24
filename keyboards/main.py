@@ -106,7 +106,7 @@ def build_main_menu():
         [InlineKeyboardButton("🧾 Выбрать канал", callback_data="choose_channel")],
         [InlineKeyboardButton("💳 Оплатить подписку", callback_data="pay")],
         [InlineKeyboardButton("📄 Моя подписка", callback_data="my_subscription")],
-        [InlineKeyboardButton("ℹ️ Информация", callback_data="channel_info")],
+        [InlineKeyboardButton("ℹ️ Информация о каналах", callback_data="channel_info")],
         [InlineKeyboardButton("✉️ Поддержка", url="https://t.me/Babikhin_Artem")],
     ])
 

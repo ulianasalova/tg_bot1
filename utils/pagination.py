@@ -1,4 +1,3 @@
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from keyboards.main import build_user_cancel_button
 from utils.formatting import format_user_card_simple
 from keyboards.main import build_user_confirm_button

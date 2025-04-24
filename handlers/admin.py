@@ -160,7 +160,14 @@ async def send_history_page(message, context):
         return
 
     for user in current_users:
-        user_id, name, status, payment_date, previous_date, channel_key, username = user
+        user_id = user["user_id"]
+        name = user["name"]
+        status = user["payment_status"]
+        payment_date = user["payment_date"]
+        previous_date = user.get("previous_date")  # может быть None
+        channel_key = user["channel_key"]
+        username = user.get("username")  # может быть None
+
         text = format_user_card(
             user_id=user_id,
             name=name,
@@ -170,6 +177,7 @@ async def send_history_page(message, context):
             channel_key=channel_key,
             username=username
         )
+
         await message.reply_text(
             text=text,
             reply_markup=build_history_keyboard(user_id, status, channel_key, payment_date),
