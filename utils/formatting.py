@@ -1,4 +1,4 @@
-from config import Config
+from utils.storage import fetch_channels
 
 
 def format_user_card(user_id, name, username, channel_key, payment_date=None, previous_date=None, status=None):
@@ -6,7 +6,7 @@ def format_user_card(user_id, name, username, channel_key, payment_date=None, pr
     date_text = f"📅 Дата оплаты: {payment_date}" if payment_date else "📅 Дата оплаты: —"
     prev_text = f"↩ Предыдущая: {previous_date}" if previous_date else ""
 
-    channel_info = Config.CHANNELS.get(channel_key)
+    channel_info = fetch_channels().get(channel_key)
     channel_text = f"📌 Канал: {channel_info['title']}" if channel_info else "📌 Канал: —"
 
     username_text = f" (@{username})" if username else ""
@@ -21,7 +21,7 @@ def format_user_card(user_id, name, username, channel_key, payment_date=None, pr
 
 
 def format_user_subscription_card(name, user_id, channel_key, payment_date, days_left):
-    channel_info = Config.CHANNELS.get(channel_key)
+    channel_info = fetch_channels().get(channel_key)
     channel_title = channel_info['title'] if channel_info else "—"
 
     if payment_date:
@@ -44,7 +44,7 @@ def format_user_subscription_card(name, user_id, channel_key, payment_date, days
 
 def format_user_card_simple(user_id, name, username, channel_key, payment_date):
     username_text = f" (@{username})" if username else ""
-    channel_info = Config.CHANNELS.get(channel_key)
+    channel_info = fetch_channels().get(channel_key)
     channel_title = channel_info["title"] if channel_info else channel_key
     return (
         f"👤 {name}{username_text} (ID: <code>{user_id}</code>)\n"
@@ -58,7 +58,7 @@ def format_user_channel_card(user_id, name, username, channel_key, payment_statu
     date_text = f"📅 Дата оплаты: {payment_date}" if payment_date else "📅 Дата оплаты: —"
     prev_text = f"↩ Предыдущая: {previous_date}" if previous_date else ""
 
-    channel_info = Config.CHANNELS.get(channel_key)
+    channel_info = fetch_channels().get(channel_key)
     channel_title = channel_info['title'] if channel_info else f"[{channel_key}]"
 
     username_text = f" (@{username})" if username else ""
