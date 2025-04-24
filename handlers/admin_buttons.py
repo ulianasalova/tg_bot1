@@ -1,12 +1,11 @@
 from telegram import Update
 from telegram.ext import ContextTypes, CallbackQueryHandler
-from config import Config
 from keyboards.main import build_channel_filter_keyboard, build_history_keyboard
 from db import is_admin, mark_as_paid_custom, mark_as_unpaid
 from datetime import datetime, timedelta
 import csv
 from logger import logger
-from db import get_all_users_with_channels
+from utils.storage import fetch_channels
 
 # ✅ Обработчик кнопок от администратора
 
@@ -41,7 +40,7 @@ async def handle_admin_buttons(update: Update, context: ContextTypes.DEFAULT_TYP
         await query.edit_message_text("🧾 Список оплат, ожидающих подтверждения:")
         for user in users:
             user_id, name, username, channel_key, payment_date = user
-            channel_title = Config.CHANNELS.get(channel_key, {}).get("title", channel_key)
+            channel_title = fetch_channels().get(channel_key, {}).get("title", channel_key)
             username_str = f"@{username}" if username else "(без username)"
             text = (
                 f"👤 <b>{name}</b> {username_str} (ID: <code>{user_id}</code>)\n"
@@ -89,7 +88,7 @@ async def handle_admin_buttons(update: Update, context: ContextTypes.DEFAULT_TYP
         )
 
         # ⬇️ Новое: уведомляем пользователя
-        channel_info = Config.CHANNELS.get(channel_key)
+        channel_info = fetch_channels().get(channel_key)
         channel_title = channel_info["title"] if channel_info else channel_key
 
         try:
@@ -213,7 +212,7 @@ async def handle_admin_buttons(update: Update, context: ContextTypes.DEFAULT_TYP
         # 🔹 Формируем блок статистики по каналам
         channel_lines = ""
         for key, stats in channel_stats.items():
-            info = Config.CHANNELS.get(key)
+            info = fetch_channels().get(key)
             title = info["title"] if info else key
             channel_lines += (
                 f"\n🏷 <b>{title}</b>:\n"
@@ -319,7 +318,7 @@ async def handle_admin_buttons(update: Update, context: ContextTypes.DEFAULT_TYP
         text = f"📜 История пользователя <code>{user_id}</code>:\n\n"
         for log in logs:
             channel_key, date_logged, action, old_date, new_date, by_admin = log
-            channel_title = Config.CHANNELS.get(channel_key, {}).get("title", channel_key)
+            channel_title = fetch_channels().get(channel_key, {}).get("title", channel_key)
             date_str = date_logged[:10]
             if action == "confirmed":
                 text += (

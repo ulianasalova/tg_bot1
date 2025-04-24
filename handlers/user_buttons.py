@@ -4,6 +4,7 @@ from telegram.ext import ContextTypes, CallbackQueryHandler
 from logger import logger
 from keyboards.main import build_main_menu
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+from utils.storage import fetch_channels
 
 def add_main_menu_button(keyboard_rows):
     if isinstance(keyboard_rows, tuple):
@@ -46,7 +47,7 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
         else:
             # Несколько каналов — кнопки выбора
             keyboard_rows = [
-                [InlineKeyboardButton(Config.CHANNELS[ch["channel_key"]]["title"],
+                [InlineKeyboardButton(fetch_channels()[ch["channel_key"]]["title"],
                                       callback_data=f"pay_channel:{ch['channel_key']}")]
                 for ch in channels
             ]
@@ -73,7 +74,7 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
             reply_markup=add_main_menu_button([])
         )
 
-        channel_info = Config.CHANNELS.get(channel_key)
+        channel_info = fetch_channels().get(channel_key)
         channel_title = channel_info["title"] if channel_info else "не выбран"
 
         admin_ids = get_admins_for_channel(channel_key)
@@ -119,7 +120,7 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
             payment_date = ch["payment_date"]
             previous_date = ch["previous_payment_date"]
 
-            channel_info = Config.CHANNELS.get(channel_key)
+            channel_info = fetch_channels().get(channel_key)
             channel_title = channel_info["title"] if channel_info else channel_key
 
             if payment_date:
@@ -162,7 +163,7 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
     elif data in ("info", "channel_info"):
         text = "\n\n".join([
             f"<b>{c['title']}</b>\n{c['description']}"
-            for c in Config.CHANNELS.values()
+            for c in fetch_channels().values()
         ])
         text += "\n\n<i>Оплата за месячную подписку на любой из каналов <b>1500 рублей</b></i>"
 
@@ -203,14 +204,14 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     elif data.startswith("set_channel:"):
         channel_key = data.split(":")[1]
-        if channel_key not in Config.CHANNELS:
+        if channel_key not in fetch_channels():
             await query.answer("❌ Канал не найден", show_alert=True)
             return
 
         from db import add_user_channel
         add_user_channel(user.id, channel_key)
 
-        channel = Config.CHANNELS[channel_key]
+        channel = fetch_channels()[channel_key]
         await query.edit_message_text(
             f"✅ Вы выбрали канал:\n<b>{channel['title']}</b>\nПосле оплаты подписки вы получите к нему доступ!",
             parse_mode="HTML",

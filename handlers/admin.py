@@ -6,6 +6,7 @@ from db import get_paid_users_for_admin
 from telegram import Update
 from telegram.ext import ContextTypes
 from db import get_unpaid_users_with_channels, is_admin
+from utils.storage import fetch_channels
 
 
 async def invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -16,7 +17,7 @@ async def invite(update: Update, context: ContextTypes.DEFAULT_TYPE):
     bot_username = context.bot.username
     success_channels = []
 
-    for key, channel in Config.CHANNELS.items():
+    for key, channel in fetch_channels().items():
         start_link = f"https://t.me/{bot_username}?start={key}"
 
         keyboard = InlineKeyboardMarkup([
@@ -266,7 +267,7 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # 🔰 Заголовок
     if channel_filter:
-        channel_info = Config.CHANNELS.get(channel_filter)
+        channel_info = fetch_channels().get(channel_filter)
         title = channel_info["title"] if channel_info else channel_filter.capitalize()
         await message.reply_text(f"📋 Пользователи канала <b>{title}</b> ({len(users)} чел.)", parse_mode="HTML")
     elif query:

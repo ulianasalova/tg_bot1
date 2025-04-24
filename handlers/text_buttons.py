@@ -12,8 +12,8 @@ async def handle_text_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     if text == "ℹ️ Информация о каналах":
         text = "\n\n".join([
-            f"<b>{c['title']}</b>\n{c['description']}"
-            for c in Config.CHANNELS.values()
+            f"<b>{c['title']}</b>\n{c['description']}\n Оплата за месячный доступ на любой из каналов 1500 рублей"
+            for c in fetch_channels().values()
         ])
         await update.message.reply_text(text, parse_mode="HTML")
 
@@ -43,7 +43,7 @@ async def handle_text_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
             payment_date = ch["payment_date"]
             previous_date = ch["previous_payment_date"]
 
-            channel_info = Config.CHANNELS.get(channel_key)
+            channel_info = fetch_channels().get(channel_key)
             channel_title = channel_info["title"] if channel_info else channel_key
 
             if payment_date:

@@ -1,5 +1,5 @@
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
-from config import Config
+from utils.storage import fetch_channels
 
 def build_reminder_keyboard():
     return InlineKeyboardMarkup([
@@ -63,7 +63,7 @@ def build_channel_filter_keyboard(admin_id: int):
 
     # 🏷 Кнопки по каждому каналу админа
     for key in channels:
-        info = Config.CHANNELS.get(key)
+        info = fetch_channels().get(key)
         title = info["title"] if info else key.capitalize()
         keyboard.append([InlineKeyboardButton(title, callback_data=f"admin_filter:{key}")])
 
@@ -112,9 +112,10 @@ def build_main_menu():
 
 
 def build_channel_keyboard():
+    from utils.storage import fetch_channels
     buttons = []
 
-    for key, channel in Config.CHANNELS.items():
+    for key, channel in fetch_channels().items():
         text = channel["title"]
         buttons.append([InlineKeyboardButton(text, callback_data=f"set_channel:{key}")])
 

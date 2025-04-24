@@ -3,6 +3,7 @@ import sqlite3
 from config import DB_NAME
 import json
 from logger import logger
+from utils.storage import fetch_channels
 
 def init_db():
     conn = sqlite3.connect(DB_NAME)
@@ -74,10 +75,11 @@ def init_db():
     """)
     from config import Config
 
-    # Проверка: есть ли уже записи в таблице каналов
+    Проверка: есть ли уже записи в таблице каналов
     c.execute("SELECT COUNT(*) FROM channels")
     if c.fetchone()[0] == 0:
-        for key, data in Config.CHANNELS.items():
+        for key, data in fetch_channels().items()
+:
             c.execute("""
                 INSERT INTO channels (key, title, description, tg_id)
                 VALUES (?, ?, ?, ?)

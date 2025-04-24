@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 from db import add_user, add_user_channel
-from config import Config
+from utils.storage import fetch_channels
 from keyboards.main import build_main_menu
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -19,7 +19,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # 2. Если пользователь перешел по приглашению из канала
     if args:
         channel_key = args[0]
-        if channel_key in Config.CHANNELS:
+        if channel_key in fetch_channels():
             add_user_channel(user.id, channel_key)
 
     # 3. Приветственное сообщение и меню
