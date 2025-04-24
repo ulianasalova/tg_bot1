@@ -158,11 +158,15 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
         await query.edit_message_text("⏰ Напоминание будет отправлено завтра.")
 
 
+
     elif data in ("info", "channel_info"):
         text = "\n\n".join([
-            f"<b>{c['title']}</b>\n{c['description']}\n\n<i>Оплата за месячную подписку на любой из каналов <b>1500 рублей</b></i>"
+            f"<b>{c['title']}</b>\n{c['description']}"
             for c in Config.CHANNELS.values()
         ])
+        text += "\n\n<i>Оплата за месячную подписку на любой из каналов <b>1500 рублей</b></i>"
+
+        await query.message.edit_text(text, parse_mode="HTML")
 
         await query.edit_message_text(
             text="ℹ️ <b>Информация о каналах</b>\n\n" + text,
