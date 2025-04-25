@@ -67,3 +67,4 @@ def start_scheduler(bot):
     )
     scheduler.start()
     print("✅ Планировщик запущен: каждый день в 10:00 по Москве")
+
