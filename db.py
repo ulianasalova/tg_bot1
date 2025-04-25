@@ -471,18 +471,16 @@ def get_all_users():
         SELECT 
             u.id,
             u.name,
-            u.username,
-            uc.channel_key,
+            uc.payment_status,
             uc.payment_date,
-            uc.previous_payment_date,
-            uc.payment_status
+            uc.next_reminder_date
         FROM users u
         JOIN user_channels uc ON u.id = uc.user_id
     """)
 
-    users = c.fetchall()
+    result = c.fetchall()
     conn.close()
-    return users
+    return result
 
 def get_user_payment_log(user_id: int):
     conn = sqlite3.connect(DB_NAME)

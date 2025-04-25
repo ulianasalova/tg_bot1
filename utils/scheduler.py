@@ -39,7 +39,7 @@ async def send_reminders(bot):
                         chat_id=user_id,
                         text=(
                             "❌ Мы не получили оплату. "
-                            "Доступ к каналу SwimGlide приостановлен 😢\n"
+                            "Доступ к каналу SwimGlide будет приостановлен 😢\n"
                             "❤️ Мы ждём тебя обратно!"
                         ),
                         reply_markup=build_comeback_keyboard()
@@ -62,7 +62,7 @@ async def send_reminders(bot):
 def start_scheduler(bot):
     scheduler.add_job(
         send_reminders,
-        CronTrigger(hour=14, minute=30, timezone=moscow),
+        CronTrigger(hour=10, minute=00, timezone=moscow),
         args=[bot]
     )
     scheduler.start()
