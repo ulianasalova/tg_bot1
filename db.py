@@ -819,9 +819,8 @@ def get_users_pending_confirmation():
              GROUP BY user_id, channel_key
          )
      ) pl ON pl.user_id = uc.user_id AND pl.channel_key = uc.channel_key
-     WHERE uc.payment_status = 'not_paid'
-       AND (uc.payment_date IS NULL OR DATE(pl.new_date) = DATE(uc.payment_date))
-       AND pl.action != 'confirmed'
+     WHERE pl.action != 'confirmed'
+       AND (uc.payment_date IS NULL OR DATE(pl.new_date) = DATE(uc.payment_date))  
     """)
 
     results = c.fetchall()
