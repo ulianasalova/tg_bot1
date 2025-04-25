@@ -80,7 +80,7 @@ async def main():
      # Ввод имени и даты
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name_input))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_date_input))
-    # app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_buttons))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_buttons))
 
 
     # Дополнительные админ-команды (например, /broadcast и т.д.)
