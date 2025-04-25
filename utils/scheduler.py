@@ -62,9 +62,9 @@ async def send_reminders(bot):
 def start_scheduler(bot):
     scheduler.add_job(
         send_reminders,
-        CronTrigger(hour=10, minute=00, timezone=moscow),
+        CronTrigger(hour=15, minute=10, timezone=moscow),
         args=[bot]
     )
     scheduler.start()
-    print("✅ Планировщик запущен: каждый день в 10:00 по Москве")
+    print("✅ Планировщик запущен: каждый день в 17:10 по Москве")
 
