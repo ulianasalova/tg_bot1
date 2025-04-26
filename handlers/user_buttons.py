@@ -24,15 +24,14 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     from db import (
         get_user_channels, get_user_by_id, get_admins_for_channel,
-        get_admin_by_id, get_superadmin_ids, mark_as_paid_custom, postpone_reminder
+         mark_as_paid_custom, postpone_reminder, mark_user_come_back
     )
-    from keyboards.main import build_paid_button, build_user_confirm_button, build_channel_keyboard
+    from keyboards.main import build_user_confirm_button, build_channel_keyboard
     from utils.notifications import notify_admins
-    from config import Config
-    from datetime import datetime, timedelta
-    from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
-    # 🔹 Оплата
+    from datetime import datetime, timedelta
+    from telegram import InlineKeyboardButton
+
     if data == "pay":
         channels = get_user_channels(user_id)
 
@@ -52,12 +51,13 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
                 for ch in channels
             ]
 
+            keyboard = add_main_menu_button(keyboard_rows)
+
             await query.edit_message_text(
-                "Выберите канал для оплаты:",
-                reply_markup=add_main_menu_button(keyboard_rows)
+                "💳 Выберите канал, по которому хотите произвести оплату:",
+                reply_markup=keyboard
             )
 
-            await query.edit_message_text("💳 Выберите канал, по которому хотите произвести оплату:", reply_markup=keyboard)
 
     # 🔹 Оплата по выбранному каналу
     elif data.startswith("pay_channel:"):
@@ -154,8 +154,9 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
 
     # 🔹 Остальные кнопки
-    elif data == "remind_later":
-        postpone_reminder(user_id)
+    elif data.startswith("remind_later:"):
+        channel_key = data.split(":")[1]
+        postpone_reminder(user_id, channel_key)
         await query.edit_message_text("⏰ Напоминание будет отправлено завтра.")
 
 
@@ -176,25 +177,34 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
 
 
-
     elif data == "contact_admin":
         await query.edit_message_text("📩 Связь с админом: @Babikhin_Artem")
 
-    elif data == "come_back":
+
+    elif data.startswith("come_back:"):
+        from datetime import datetime, timedelta
+        from utils.scheduler import schedule_check_come_back
+        from db import mark_user_as_expired
+        channel_key = data.split(":")[1]
+        mark_user_as_expired(user_id, channel_key)
         await query.edit_message_text("❤️ Мы вас очень ждём! Возвращайтесь как можно скорее!")
         try:
             full = f"{user.first_name} (@{user.username})" if user.username else user.first_name
             await notify_admins(
                 bot=context.bot,
                 text=f"🔔 Пользователь <b>{full}</b> нажал кнопку \"Я вернусь\".\n🆔 ID: <code>{user.id}</code>",
+                channel_key=channel_key,
                 parse_mode="HTML"
             )
+            mark_user_come_back(user_id, channel_key)
+            # Планируем напоминание админу через 7 дней
+            schedule_check_come_back(context.bot, user_id, full, delay_days=7)
+
         except Exception as e:
-            print(f"Ошибка при уведомлении админа: {e}")
+            print(f"Ошибка при обработке 'Я вернусь' для пользователя {user_id}: {e}")
 
 
     elif data == "choose_channel":
-
         keyboard = build_channel_keyboard()
         reply_markup = add_main_menu_button(list(keyboard.inline_keyboard))  # 👈 фикс
         await query.edit_message_text(
@@ -272,12 +282,12 @@ def get_user_button_handler():
             r"pay|"
             r"pay_channel:.*|"
             r"paid:.*|"
-            r"remind_later|"
+            r"remind_later(:.*)?|"  # 🛠 ВАЖНО: добавили '|'
             r"status|"
             r"contact_admin|"
             r"my_subscription|"
-            r"come_back|"
-            r"main_menu"      # 👈 Добавляем сюда!
+            r"come_back(:.*)?|"
+            r"main_menu"
             r")$"
         )
     )

@@ -415,15 +415,19 @@ def get_admin_channels(user_id: int) -> list[str]:
 
 def postpone_reminder(user_id: int, channel_key: str):
     conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    next_day = (datetime.now() + timedelta(days=1)).isoformat()
-    c.execute("""
-        UPDATE user_channels
-        SET next_reminder_date = ?
-        WHERE user_id = ? AND channel_key = ?
-    """, (next_day, user_id, channel_key))
-    conn.commit()
-    conn.close()
+    try:
+        c = conn.cursor()
+        next_day = (datetime.now() + timedelta(days=1)).date().isoformat()
+        c.execute("""
+            UPDATE user_channels
+            SET next_reminder_date = ?
+            WHERE user_id = ? AND channel_key = ?
+        """, (next_day, user_id, channel_key))
+        conn.commit()
+    except Exception as e:
+        print(f"⚠️ Ошибка при переносе напоминания для пользователя {user_id}: {e}")
+    finally:
+        conn.close()
 
 
 def get_unpaid_users():
@@ -468,19 +472,23 @@ def get_all_users():
     c = conn.cursor()
 
     c.execute("""
-        SELECT 
-            u.id,
-            u.name,
-            uc.payment_status,
-            uc.payment_date,
-            uc.next_reminder_date
-        FROM users u
-        JOIN user_channels uc ON u.id = uc.user_id
+    SELECT 
+        u.id,
+        u.name,
+        uc.payment_status,
+        uc.payment_date,
+        uc.next_reminder_date,
+        uc.channel_key,
+        c.title
+    FROM users u
+    JOIN user_channels uc ON u.id = uc.user_id
+    JOIN channels c ON uc.channel_key = c.key
     """)
 
     result = c.fetchall()
     conn.close()
     return result
+
 
 def get_user_payment_log(user_id: int):
     conn = sqlite3.connect(DB_NAME)
@@ -806,19 +814,28 @@ def get_users_pending_confirmation():
     c = conn.cursor()
 
     c.execute("""
-     SELECT uc.user_id, u.name, u.username, uc.channel_key, uc.payment_date
-     FROM user_channels uc
-     JOIN users u ON u.id = uc.user_id
-     LEFT JOIN (
-         SELECT * FROM payment_log
-         WHERE id IN (
-             SELECT MAX(id)
-             FROM payment_log
-             GROUP BY user_id, channel_key
-         )
-     ) pl ON pl.user_id = uc.user_id AND pl.channel_key = uc.channel_key
-     WHERE pl.action != 'confirmed'
-       AND (uc.payment_date IS NULL OR DATE(pl.new_date) = DATE(uc.payment_date))  
+        SELECT 
+            uc.user_id,
+            u.name,
+            u.username,
+            uc.channel_key,
+            uc.payment_date
+        FROM user_channels uc
+        JOIN users u ON u.id = uc.user_id
+        LEFT JOIN (
+            SELECT * 
+            FROM payment_log
+            WHERE id IN (
+                SELECT MAX(id)
+                FROM payment_log
+                GROUP BY user_id, channel_key
+            )
+        ) pl ON pl.user_id = uc.user_id AND pl.channel_key = uc.channel_key
+        WHERE (pl.action IS NULL)
+          AND (
+              uc.payment_date IS NULL 
+              OR DATE(pl.new_date) != DATE(uc.payment_date)
+          )
     """)
 
     results = c.fetchall()
@@ -836,3 +853,26 @@ def get_distinct_users():
     users = c.fetchall()
     conn.close()
     return users  # список кортежей (user_id, name, username)
+
+def mark_user_as_expired(user_id: int, channel_key: str):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE user_channels
+        SET payment_status = 'expired'
+        WHERE user_id = ? AND channel_key = ?
+    """, (user_id, channel_key))
+    conn.commit()
+    conn.close()
+
+def mark_user_come_back(user_id: int, channel_key: str):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("""
+        UPDATE user_channels
+        SET payment_status = 'come_back'
+        WHERE user_id = ? AND channel_key = ?
+    """, (user_id, channel_key))
+    conn.commit()
+    conn.close()
+

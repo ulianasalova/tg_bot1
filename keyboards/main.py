@@ -1,14 +1,12 @@
-from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from utils.storage import fetch_channels
 
-def build_reminder_keyboard():
+def build_reminder_keyboard(channel_key: str):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("💸 Оплатить", callback_data="pay")],
-        [InlineKeyboardButton("✅ Я оплатил", callback_data="paid")],
-        [InlineKeyboardButton("⏰ Напомнить позже", callback_data="remind_later")],
+        [InlineKeyboardButton("💸 Оплатить", callback_data=f"pay_channel:{channel_key}")],
+        [InlineKeyboardButton("✅ Я оплатил", callback_data=f"paid:{channel_key}")],
+        [InlineKeyboardButton("⏰ Напомнить позже", callback_data=f"remind_later:{channel_key}")],
     ])
 
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 
 def build_paid_button(channel_key=None):
     callback_data = "paid"
@@ -26,11 +24,12 @@ def build_user_confirm_button(user_id: int, channel_key: str):
         [InlineKeyboardButton("✅ Подтвердить оплату", callback_data=f"admin_confirm:{user_id}:{channel_key}")]
     ])
 
-def build_comeback_keyboard():
+def build_comeback_keyboard(channel_key: str):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🙏 Я вернусь", callback_data="come_back")],
-        [InlineKeyboardButton("💸 Я не могу без вас! Готов оплатить", callback_data="pay")]
+        [InlineKeyboardButton("🙏 Я вернусь позже", callback_data=f"come_back:{channel_key}")],
+        [InlineKeyboardButton("💸 Я не могу без вас! Готов оплатить", callback_data=f"pay_channel:{channel_key}")]
     ])
+
 
 def build_user_cancel_button(user_id: int):
     return InlineKeyboardMarkup([
@@ -51,7 +50,6 @@ def build_admin_panel():
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 from db import get_admin_channels
-from config import Config
 
 def build_channel_filter_keyboard(admin_id: int):
     channels = get_admin_channels(admin_id)  # Получаем список ключей каналов
