@@ -76,7 +76,7 @@ async def send_reminders(bot):
             print(f"⚠️ Не удалось отправить пользователю {user_id}: {e}")
 
 def start_scheduler(bot):
-        scheduler.add_job(
+    scheduler.add_job(
         send_reminders,
         CronTrigger(hour=11, minute=30, timezone=moscow),
         args=[bot]
