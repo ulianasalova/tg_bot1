@@ -27,8 +27,8 @@ async def send_reminders(bot):
         try:
             if status == "paid" and payment_date_str:
                 payment_date = datetime.fromisoformat(payment_date_str).date()
-                remind_date = payment_date + timedelta(days=27)
-                expire_date = payment_date + timedelta(days=30)
+                remind_date = payment_date + timedelta(days=28)
+                expire_date = payment_date + timedelta(days=31)
 
                 if remind_date <= today < expire_date:
                     await bot.send_message(
@@ -40,7 +40,7 @@ async def send_reminders(bot):
                             "Пожалуйста, продли её 💳"
                         ),
                         reply_markup=build_reminder_keyboard(channel_key),
-                        parse_mode = "HTML"
+                        parse_mode="HTML"
                     )
 
 
@@ -75,6 +75,7 @@ async def send_reminders(bot):
         except Exception as e:
             print(f"⚠️ Не удалось отправить пользователю {user_id}: {e}")
 
+
 def start_scheduler(bot):
     scheduler.add_job(
         send_reminders,
@@ -83,7 +84,6 @@ def start_scheduler(bot):
     )
     scheduler.start()
     print("✅ Планировщик запущен: каждый день в 17:10 по Москве")
-
 
 
 async def notify_admin_about_come_back(bot, user_id: int, user_name: str):
@@ -97,6 +97,7 @@ async def notify_admin_about_come_back(bot, user_id: int, user_name: str):
     for admin_id in admin_ids:
         await bot.send_message(admin_id, text)
 
+
 def schedule_check_come_back(bot, user_id: int, user_name: str, delay_days=7):
     run_date = datetime.now() + timedelta(days=delay_days)
 
@@ -107,4 +108,3 @@ def schedule_check_come_back(bot, user_id: int, user_name: str, delay_days=7):
         id=f"remind_come_back_{user_id}",  # уникальный id задачи
         replace_existing=True
     )
-
