@@ -3,6 +3,7 @@ import nest_asyncio
 from fastapi import FastAPI, Request
 from telegram import Update, BotCommand, BotCommandScopeDefault, BotCommandScopeChat
 from telegram.ext import Application, ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+from contextlib import asynccontextmanager
 
 from config import Config
 from db import init_db, create_indexes, get_all_admins
@@ -23,17 +24,32 @@ from utils.pagination import handle_pagination_callback
 
 nest_asyncio.apply()
 
-app = FastAPI()
-application: Application = ApplicationBuilder().token(Config.BOT_TOKEN).build()
+# Создаем FastAPI
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    create_indexes()
 
+    await telegram_app.bot.delete_webhook(drop_pending_updates=True)
+    await setup_bot_commands()
+
+    start_scheduler(telegram_app.bot)
+
+    webhook_url = f"https://{Config.WEBHOOK_HOST}/webhook"
+    await telegram_app.bot.set_webhook(url=webhook_url)
+    print("\u2705 Lifespan startup complete")
+    yield
+    print("\u23F9 Lifespan shutdown")
+
+app = FastAPI(lifespan=lifespan)
+
+# Настроим Telegram приложение
+telegram_app: Application = ApplicationBuilder().token(Config.BOT_TOKEN).build()
 
 async def setup_bot_commands():
-    await application.bot.set_my_commands(
-        [
-            BotCommand("start", "Запустить бота"),
-        ],
-        scope=BotCommandScopeDefault(),
-    )
+    await telegram_app.bot.set_my_commands([
+        BotCommand("start", "Запустить бота"),
+    ], scope=BotCommandScopeDefault())
 
     admin_commands = [
         BotCommand("admin", "⚙ Админ-панель"),
@@ -45,48 +61,26 @@ async def setup_bot_commands():
 
     admins = get_all_admins()
     for admin in admins:
-        await application.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin[0]))
+        await telegram_app.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin[0]))
 
-
+# Вебхук обработчик
 @app.post("/webhook")
 async def webhook_handler(request: Request):
     data = await request.json()
-    update = Update.de_json(data, application.bot)
-    await application.process_update(update)
+    update = Update.de_json(data, bot=telegram_app.bot)
+    await telegram_app.process_update(update)
     return {"ok": True}
 
-
-@app.on_event("startup")
-async def on_startup():
-    init_db()
-    create_indexes()
-
-    await application.initialize()
-
-    await application.bot.delete_webhook(drop_pending_updates=True)
-    await setup_bot_commands()
-    start_scheduler(application.bot)
-
-    # --- Регистрация обработчиков ---
-    application.add_handler(CallbackQueryHandler(handle_user_selected, pattern=r"^select_user:"))
-    application.add_handler(CallbackQueryHandler(handle_channel_selected, pattern=r"^select_channel:"))
-    application.add_handler(CallbackQueryHandler(handle_pagination_callback, pattern=r"^(paid_page|unpaid_page|history_page):(prev|next)$"))
-
-    application.add_handler(get_admin_button_handler())
-    application.add_handler(get_user_button_handler())
-    application.add_handler(CommandHandler("start", start))
-    application.add_handler(CommandHandler("update_pay", handle_update_pay_command))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name_input))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_date_input))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_buttons))
-
-    for handler in get_admin_handlers():
-        application.add_handler(handler)
-
-    webhook_url = f"https://{Config.WEBHOOK_HOST}/webhook"
-    await application.bot.set_webhook(url=webhook_url)
-
-
-@app.on_event("shutdown")
-async def on_shutdown():
-    await application.shutdown()
+# Регистрируем хендлеры
+telegram_app.add_handler(CallbackQueryHandler(handle_user_selected, pattern=r"^select_user:"))
+telegram_app.add_handler(CallbackQueryHandler(handle_channel_selected, pattern=r"^select_channel:"))
+telegram_app.add_handler(CallbackQueryHandler(handle_pagination_callback, pattern=r"^(paid_page|unpaid_page|history_page):(prev|next)$"))
+telegram_app.add_handler(get_admin_button_handler())
+telegram_app.add_handler(get_user_button_handler())
+telegram_app.add_handler(CommandHandler("start", start))
+telegram_app.add_handler(CommandHandler("update_pay", handle_update_pay_command))
+telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name_input))
+telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_date_input))
+telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_buttons))
+for handler in get_admin_handlers():
+    telegram_app.add_handler(handler)
