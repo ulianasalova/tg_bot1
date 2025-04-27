@@ -2,7 +2,7 @@ import asyncio
 import nest_asyncio
 from fastapi import FastAPI, Request
 from telegram import Update, BotCommand, BotCommandScopeDefault, BotCommandScopeChat
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+from telegram.ext import Application, ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
 from config import Config
 from db import init_db, create_indexes, get_all_admins
@@ -24,15 +24,15 @@ from utils.pagination import handle_pagination_callback
 nest_asyncio.apply()
 
 app = FastAPI()
+application: Application = ApplicationBuilder().token(Config.BOT_TOKEN).build()
 
-application = ApplicationBuilder().token(Config.BOT_TOKEN).build()
 
-# Устанавливаем команды\async def setup_bot_commands():
+async def setup_bot_commands():
     await application.bot.set_my_commands(
         [
             BotCommand("start", "Запустить бота"),
         ],
-        scope=BotCommandScopeDefault()
+        scope=BotCommandScopeDefault(),
     )
 
     admin_commands = [
@@ -40,11 +40,21 @@ application = ApplicationBuilder().token(Config.BOT_TOKEN).build()
         BotCommand("invite", "📩 Приглашение в канал"),
         BotCommand("update_pay", "📝 Внести дату оплаты вручную"),
         BotCommand("broadcast", "📢 Рассылка подписчикам"),
+        BotCommand("start", "Запустить бота"),
     ]
 
     admins = get_all_admins()
     for admin in admins:
         await application.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin[0]))
+
+
+@app.post("/webhook")
+async def webhook_handler(request: Request):
+    data = await request.json()
+    update = Update.de_json(data, application.bot)
+    await application.process_update(update)
+    return {"ok": True}
+
 
 @app.on_event("startup")
 async def on_startup():
@@ -53,9 +63,11 @@ async def on_startup():
 
     await application.initialize()
 
+    await application.bot.delete_webhook(drop_pending_updates=True)
     await setup_bot_commands()
     start_scheduler(application.bot)
 
+    # --- Регистрация обработчиков ---
     application.add_handler(CallbackQueryHandler(handle_user_selected, pattern=r"^select_user:"))
     application.add_handler(CallbackQueryHandler(handle_channel_selected, pattern=r"^select_channel:"))
     application.add_handler(CallbackQueryHandler(handle_pagination_callback, pattern=r"^(paid_page|unpaid_page|history_page):(prev|next)$"))
@@ -74,9 +86,7 @@ async def on_startup():
     webhook_url = f"https://{Config.WEBHOOK_HOST}/webhook"
     await application.bot.set_webhook(url=webhook_url)
 
-@app.post("/webhook")
-async def webhook_handler(request: Request):
-    data = await request.json()
-    update = Update.de_json(data, bot=application.bot)
-    await application.process_update(update)
-    return {"ok": True}
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    await application.shutdown()
