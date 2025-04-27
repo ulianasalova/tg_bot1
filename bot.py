@@ -1,11 +1,14 @@
 import asyncio
 import nest_asyncio
-from fastapi import FastAPI, Request
-from fastapi import Response
-from fastapi import status
-from fastapi.lifespan import Lifespan
+from fastapi import FastAPI, Request, Response, status
 from telegram import Update, BotCommand, BotCommandScopeDefault, BotCommandScopeChat
-from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    CallbackQueryHandler,
+    filters,
+)
 
 from config import Config
 from db import init_db, create_indexes, get_all_admins
@@ -26,35 +29,20 @@ from utils.pagination import handle_pagination_callback
 
 nest_asyncio.apply()
 
-# Создаем экземпляр приложения Telegram
+# Telegram-приложение
 telegram_app = ApplicationBuilder().token(Config.BOT_TOKEN).build()
 
-# FastAPI-приложение с lifespan
+# FastAPI-приложение
 app = FastAPI()
 
-@app.post("/webhook")
-async def webhook_handler(request: Request):
-    data = await request.json()
-    update = Update.de_json(data, bot=telegram_app.bot)
-    await telegram_app.process_update(update)
-    return Response(status_code=status.HTTP_200_OK)
-
-@app.on_event("startup")
-async def startup():
-    init_db()
-    create_indexes()
-    start_scheduler(telegram_app.bot)
-
-    # Удаляем старый Webhook
-    await telegram_app.bot.delete_webhook(drop_pending_updates=True)
-
-    # Устанавливаем команды бота
-    await telegram_app.bot.set_my_commands(
-        [BotCommand("start", "Запустить бота")],
+async def setup_bot_commands(app):
+    await app.bot.set_my_commands(
+        [
+            BotCommand("start", "Запустить бота"),
+        ],
         scope=BotCommandScopeDefault()
     )
 
-    admins = get_all_admins()
     admin_commands = [
         BotCommand("admin", "⚙ Админ-панель"),
         BotCommand("invite", "📩 Приглашение в канал"),
@@ -62,8 +50,23 @@ async def startup():
         BotCommand("broadcast", "📢 Рассылка подписчикам"),
         BotCommand("start", "Запустить бота"),
     ]
+
+    admins = get_all_admins()
     for admin in admins:
-        await telegram_app.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin[0]))
+        admin_id = admin[0]
+        await app.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
+
+@app.on_event("startup")
+async def startup():
+    init_db()
+    create_indexes()
+
+    await telegram_app.bot.delete_webhook(drop_pending_updates=True)
+
+    await setup_bot_commands(telegram_app)
+
+    # Планировщик
+    start_scheduler(telegram_app.bot)
 
     # Регистрируем обработчики
     telegram_app.add_handler(CallbackQueryHandler(handle_user_selected, pattern=r"^select_user:"))
@@ -85,6 +88,14 @@ async def startup():
     webhook_url = f"https://{Config.WEBHOOK_HOST}/webhook"
     await telegram_app.bot.set_webhook(url=webhook_url)
 
+@app.post("/webhook")
+async def webhook_handler(request: Request):
+    data = await request.json()
+    update = Update.de_json(data, bot=telegram_app.bot)
+    await telegram_app.process_update(update)
+    return Response(status_code=status.HTTP_200_OK)
+
 @app.on_event("shutdown")
 async def shutdown():
     await telegram_app.shutdown()
+
