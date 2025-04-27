@@ -2,13 +2,7 @@ import asyncio
 import nest_asyncio
 from fastapi import FastAPI, Request, Response, status
 from telegram import Update, BotCommand, BotCommandScopeDefault, BotCommandScopeChat
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    CallbackQueryHandler,
-    filters,
-)
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
 from config import Config
 from db import init_db, create_indexes, get_all_admins
@@ -29,14 +23,16 @@ from utils.pagination import handle_pagination_callback
 
 nest_asyncio.apply()
 
-# Telegram-приложение
-telegram_app = ApplicationBuilder().token(Config.BOT_TOKEN).build()
-
-# FastAPI-приложение
+# Создаем FastAPI
 app = FastAPI()
 
-async def setup_bot_commands(app):
-    await app.bot.set_my_commands(
+# Создаем приложение Telegram
+telegram_app = ApplicationBuilder().token(Config.BOT_TOKEN).build()
+
+
+# Устанавливаем команды
+async def setup_bot_commands():
+    await telegram_app.bot.set_my_commands(
         [
             BotCommand("start", "Запустить бота"),
         ],
@@ -54,24 +50,15 @@ async def setup_bot_commands(app):
     admins = get_all_admins()
     for admin in admins:
         admin_id = admin[0]
-        await app.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
+        await telegram_app.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
 
-@app.on_event("startup")
-async def startup():
-    init_db()
-    create_indexes()
 
-    await telegram_app.bot.delete_webhook(drop_pending_updates=True)
-
-    await setup_bot_commands(telegram_app)
-
-    # Планировщик
-    start_scheduler(telegram_app.bot)
-
-    # Регистрируем обработчики
+# Регистрируем обработчики
+def register_handlers():
     telegram_app.add_handler(CallbackQueryHandler(handle_user_selected, pattern=r"^select_user:"))
     telegram_app.add_handler(CallbackQueryHandler(handle_channel_selected, pattern=r"^select_channel:"))
-    telegram_app.add_handler(CallbackQueryHandler(handle_pagination_callback, pattern=r"^(paid_page|unpaid_page|history_page):(prev|next)$"))
+    telegram_app.add_handler(
+        CallbackQueryHandler(handle_pagination_callback, pattern=r"^(paid_page|unpaid_page|history_page):(prev|next)$"))
 
     telegram_app.add_handler(get_admin_button_handler())
     telegram_app.add_handler(get_user_button_handler())
@@ -84,10 +71,8 @@ async def startup():
     for handler in get_admin_handlers():
         telegram_app.add_handler(handler)
 
-    # Устанавливаем Webhook
-    webhook_url = f"https://{Config.WEBHOOK_HOST}/webhook"
-    await telegram_app.bot.set_webhook(url=webhook_url)
 
+# Точка входа FastAPI: Вебхук
 @app.post("/webhook")
 async def webhook_handler(request: Request):
     data = await request.json()
@@ -95,7 +80,25 @@ async def webhook_handler(request: Request):
     await telegram_app.process_update(update)
     return Response(status_code=status.HTTP_200_OK)
 
-@app.on_event("shutdown")
-async def shutdown():
-    await telegram_app.shutdown()
 
+# Событие старта FastAPI
+@app.on_event("startup")
+async def on_startup():
+    init_db()
+    create_indexes()
+    start_scheduler(telegram_app.bot)
+
+    register_handlers()
+
+    # Убираем старый вебхук
+    await telegram_app.bot.delete_webhook(drop_pending_updates=True)
+
+    # Ставим новый вебхук
+    webhook_url = f"https://{Config.WEBHOOK_HOST}/webhook"
+    await telegram_app.bot.set_webhook(url=webhook_url)
+
+
+# Событие остановки FastAPI
+@app.on_event("shutdown")
+async def on_shutdown():
+    await telegram_app.shutdown()
