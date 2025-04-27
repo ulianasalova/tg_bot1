@@ -1,7 +1,9 @@
 import asyncio
 import nest_asyncio
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
-from telegram import BotCommand, BotCommandScopeDefault, BotCommandScopeChat
+from fastapi import FastAPI, Request
+from telegram import Update, BotCommand, BotCommandScopeDefault, BotCommandScopeChat
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters
+
 from config import Config
 from db import init_db, create_indexes, get_all_admins
 from handlers.start import start
@@ -21,9 +23,17 @@ from utils.pagination import handle_pagination_callback
 
 nest_asyncio.apply()
 
-async def setup_bot_commands(app):
-    await app.bot.set_my_commands(
-        [BotCommand("start", "Запустить бота")],
+app = FastAPI()
+
+# Создаем экземпляр приложения Telegram
+application = ApplicationBuilder().token(Config.BOT_TOKEN).build()
+
+# Устанавливаем команды
+async def setup_bot_commands():
+    await application.bot.set_my_commands(
+        [
+            BotCommand("start", "Запустить бота"),
+        ],
         scope=BotCommandScopeDefault()
     )
 
@@ -37,33 +47,45 @@ async def setup_bot_commands(app):
 
     admins = get_all_admins()
     for admin in admins:
-        admin_id = admin[0]
-        await app.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
+        await application.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin[0]))
 
-async def main():
+# Обработчик вебхука
+@app.post("/webhook")
+async def webhook_handler(request: Request):
+    data = await request.json()
+    update = Update.de_json(data, bot=application.bot)
+    await application.process_update(update)
+    return {"ok": True}
+
+# Инициализация при запуске FastAPI
+@app.on_event("startup")
+async def on_startup():
     init_db()
     create_indexes()
 
-    app = ApplicationBuilder().token(Config.BOT_TOKEN).build()
+    # Удаляем старый Webhook, если был
+    await application.bot.delete_webhook(drop_pending_updates=True)
 
-    await setup_bot_commands(app)
-    start_scheduler(app.bot)
+    await setup_bot_commands()
+    start_scheduler(application.bot)
 
-    # --- Обработчики ---
-    app.add_handler(CallbackQueryHandler(handle_user_selected, pattern=r"^select_user:"))
-    app.add_handler(CallbackQueryHandler(handle_channel_selected, pattern=r"^select_channel:"))
-    app.add_handler(CallbackQueryHandler(handle_pagination_callback, pattern=r"^(paid_page|unpaid_page|history_page):(prev|next)$"))
-    app.add_handler(get_admin_button_handler())
-    app.add_handler(get_user_button_handler())
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("update_pay", handle_update_pay_command))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name_input))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_date_input))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_buttons))
+    # --- Регистрация обработчиков ---
+    application.add_handler(CallbackQueryHandler(handle_user_selected, pattern=r"^select_user:"))
+    application.add_handler(CallbackQueryHandler(handle_channel_selected, pattern=r"^select_channel:"))
+    application.add_handler(CallbackQueryHandler(handle_pagination_callback, pattern=r"^(paid_page|unpaid_page|history_page):(prev|next)$"))
 
-    # ВЕЧНЫЙ ЦИКЛ для удержания процесса
-    while True:
-        await asyncio.sleep(3600)
+    application.add_handler(get_admin_button_handler())
+    application.add_handler(get_user_button_handler())
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("update_pay", handle_update_pay_command))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name_input))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_date_input))
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_buttons))
 
-if __name__ == "__main__":
-    asyncio.run(main())
+    for handler in get_admin_handlers():
+        application.add_handler(handler)
+
+    # Устанавливаем новый Webhook
+    webhook_url = f"https://{Config.WEBHOOK_HOST}/webhook"
+    await application.bot.set_webhook(url=webhook_url)
+

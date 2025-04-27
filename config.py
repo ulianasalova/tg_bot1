@@ -3,14 +3,14 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-class Config:
-    BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-    # Загружаем переменные из .env.dev
+#     # Загружаем переменные из .env.dev
 # load_dotenv(".env.dev")  # ⚠️ на проде поменяешь на ".env.prod"
-# class Config:
-#     ENV = os.getenv("ENV", "dev")
-#     BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+class Config:
+    ENV = os.getenv("ENV", "dev")
+    BOT_TOKEN = os.getenv("BOT_TOKEN")
+    WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
 
     # Список админов (глобальных или всех)
 
