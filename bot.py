@@ -65,6 +65,20 @@ async def main():
     await application.bot.delete_webhook(drop_pending_updates=True)
     await setup_bot_commands()
     start_scheduler(application.bot)
+    import asyncio
+
+    async def main():
+        init_db()
+        create_indexes()
+
+        app = ApplicationBuilder().token(Config.BOT_TOKEN).build()
+
+        await setup_bot_commands(app)
+        start_scheduler(app.bot)
+
+        # Теперь вечная "спящая" задача
+        while True:
+            await asyncio.sleep(3600)
 
     # --- Обработчики ---
 
@@ -85,5 +99,9 @@ async def main():
     for handler in get_admin_handlers():
         application.add_handler(handler)
 
+
+
+
 if __name__ == "__main__":
     asyncio.run(main())
+
