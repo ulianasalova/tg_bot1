@@ -23,14 +23,11 @@ from utils.pagination import handle_pagination_callback
 
 nest_asyncio.apply()
 
-# Инициализация FastAPI
 app = FastAPI()
 
-# Инициализация Telegram Bot
 application = ApplicationBuilder().token(Config.BOT_TOKEN).build()
 
-# Устанавливаем команды бота
-async def setup_bot_commands():
+# Устанавливаем команды\async def setup_bot_commands():
     await application.bot.set_my_commands(
         [
             BotCommand("start", "Запустить бота"),
@@ -43,36 +40,22 @@ async def setup_bot_commands():
         BotCommand("invite", "📩 Приглашение в канал"),
         BotCommand("update_pay", "📝 Внести дату оплаты вручную"),
         BotCommand("broadcast", "📢 Рассылка подписчикам"),
-        BotCommand("start", "Запустить бота"),
     ]
 
     admins = get_all_admins()
     for admin in admins:
         await application.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin[0]))
 
-# Обработчик входящих обновлений через webhook
-@app.post("/webhook")
-async def webhook_handler(request: Request):
-    data = await request.json()
-    update = Update.de_json(data, bot=application.bot)
-    await application.process_update(update)
-    return {"ok": True}
-
-# Инициализация при старте приложения
 @app.on_event("startup")
 async def on_startup():
     init_db()
     create_indexes()
 
-    try:
-        await application.bot.delete_webhook(drop_pending_updates=True)
-    except Exception as e:
-        print(f"⚠ Не удалось удалить старый webhook: {e}")
+    await application.initialize()
 
     await setup_bot_commands()
     start_scheduler(application.bot)
 
-    # Регистрируем обработчики
     application.add_handler(CallbackQueryHandler(handle_user_selected, pattern=r"^select_user:"))
     application.add_handler(CallbackQueryHandler(handle_channel_selected, pattern=r"^select_channel:"))
     application.add_handler(CallbackQueryHandler(handle_pagination_callback, pattern=r"^(paid_page|unpaid_page|history_page):(prev|next)$"))
@@ -88,10 +71,12 @@ async def on_startup():
     for handler in get_admin_handlers():
         application.add_handler(handler)
 
-    # Устанавливаем webhook
     webhook_url = f"https://{Config.WEBHOOK_HOST}/webhook"
-    try:
-        await application.bot.set_webhook(url=webhook_url)
-        print(f"✅ Webhook установлен на {webhook_url}")
-    except Exception as e:
-        print(f"❌ Ошибка при установке webhook: {e}")
+    await application.bot.set_webhook(url=webhook_url)
+
+@app.post("/webhook")
+async def webhook_handler(request: Request):
+    data = await request.json()
+    update = Update.de_json(data, bot=application.bot)
+    await application.process_update(update)
+    return {"ok": True}
