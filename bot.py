@@ -10,6 +10,8 @@ from handlers.admin import get_admin_handlers
 from handlers.user_buttons import get_user_button_handler
 from handlers.admin_buttons import get_admin_button_handler
 from handlers.text_buttons import handle_text_buttons
+from handlers.admin_handlers import register_handlers_admin
+from handlers.admin_handlers import message_user_callback
 from handlers.update_payment import (
     handle_update_pay_command,
     handle_name_input,
