@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 import csv
 from logger import logger
 from utils.storage import fetch_channels
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
 
 # ✅ Обработчик кнопок от администратора
 
@@ -356,6 +358,28 @@ async def handle_admin_buttons(update: Update, context: ContextTypes.DEFAULT_TYP
 
         await send_unpaid_users_page(query.message, context)
 
+async def message_user_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+
+    target_user_id = int(query.data.split(":")[1])
+    context.user_data["target_user_id"] = target_user_id
+
+    await context.bot.send_message(
+        chat_id=query.from_user.id,
+        text=f"Введите сообщение, которое хотите отправить пользователю (ID: {target_user_id}):"
+    )
+async def send_text_to_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    target_user_id = context.user_data.pop("target_user_id", None)
+
+    if not target_user_id:
+        return  # не было выбора пользователя — игнорируем
+
+    try:
+        await context.bot.send_message(chat_id=target_user_id, text=update.message.text)
+        await update.message.reply_text("✅ Сообщение отправлено пользователю.")
+    except Exception as e:
+        await update.message.reply_text(f"❌ Не удалось отправить сообщение: {e}")
 
 
 

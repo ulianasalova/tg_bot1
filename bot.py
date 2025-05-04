@@ -55,20 +55,28 @@ async def lifespan(app: FastAPI):
     telegram_app.add_handler(CallbackQueryHandler(handle_user_selected, pattern=r"^select_user:"))
     telegram_app.add_handler(CallbackQueryHandler(handle_channel_selected, pattern=r"^select_channel:"))
     telegram_app.add_handler(CallbackQueryHandler(handle_pagination_callback, pattern=r"^(paid_page|unpaid_page|history_page):(prev|next)$"))
+
+    telegram_app.add_handler(CallbackQueryHandler(message_user_callback, pattern=r"^message_user:\d+$"))  # 🔹 КНОПКА
+
     telegram_app.add_handler(get_admin_button_handler())
     telegram_app.add_handler(get_user_button_handler())
     telegram_app.add_handler(CommandHandler("start", start))
     telegram_app.add_handler(CommandHandler("update_pay", handle_update_pay_command))
+
     telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name_input))
     telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_date_input))
     telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_buttons))
+
+    telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, send_text_to_user))  # 🔹 СООБЩЕНИЕ ПОЛЬЗОВАТЕЛЮ
+
     for handler in get_admin_handlers():
         telegram_app.add_handler(handler)
 
     webhook_url = f"https://{Config.WEBHOOK_HOST}/webhook"
     await telegram_app.bot.set_webhook(url=webhook_url)
 
-    yield  # <--- здесь приложение работает
+    yield  # 👈 здесь запускается сервер
+
 
     # --- SHUTDOWN ---
     await telegram_app.stop()
