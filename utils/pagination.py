@@ -73,10 +73,8 @@ async def handle_pagination_callback(update, context):
         state["page"] -= 1
 
     if page_type == "paid_page":
-        from utils.pagination import send_paid_users_page
         await send_paid_users_page(query.message, context)
     elif page_type == "unpaid_page":
-        from utils.pagination import send_unpaid_users_page
         await send_unpaid_users_page(query.message, context)
     elif page_type == "history_page":
         from handlers.admin import send_history_page
@@ -98,15 +96,15 @@ async def send_unpaid_users_page(message, context):
         await message.reply_text("⚠️ На этой странице нет пользователей.")
         return
 
-    for user_id, name, username, channel_key in page_users:
-        text = format_user_card_simple(user_id, name, username, channel_key)
+    for user_id, name, username, channel_key, payment_date in page_users:
+        text = format_user_card_simple(user_id, name, username, channel_key, payment_date)
         await message.reply_text(
             text=text,
             parse_mode="HTML",
             reply_markup=build_user_confirm_button(user_id, channel_key)
         )
 
-    # Кнопки навигации
+    # Кнопки навигации добавлено письмо
     buttons = []
     if page > 0:
         buttons.append(InlineKeyboardButton("⬅️ Назад", callback_data="unpaid_page:prev"))
