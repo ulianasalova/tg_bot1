@@ -1,6 +1,5 @@
 from telegram.ext import ContextTypes, CommandHandler
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
-from config import Config
 from utils.pagination import send_paid_users_page, send_unpaid_users_page
 from db import get_paid_users_for_admin
 from telegram import Update
@@ -99,13 +98,13 @@ async def list_unpaid(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # (user_id, name, channel_key) → теперь добавим username для вывода карточек
     users = []
-    for user_id, name, channel_key in raw_users:
+    for user_id, name, channel_key, payment_date in raw_users:
         try:
             chat = await context.bot.get_chat(user_id)
             username = chat.username
         except:
             username = None
-        users.append((user_id, name, username, channel_key))
+        users.append((user_id, name, username, channel_key, payment_date))
 
     # сохраняем в context
     context.user_data["unpaid_list"] = {
@@ -199,7 +198,6 @@ async def send_history_page(message, context):
 
 async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
     from db import get_all_users_with_channels
-    from utils.formatting import format_user_card
     message = update.message or update.callback_query.message
 
     if not is_admin(update.effective_user.id):
