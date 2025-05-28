@@ -64,7 +64,7 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
         channel_key = data.split(":")[1]
         await show_payment_details(query, context, user, channel_key)
 
-    # 🔹 Подтвердить оплату
+    # 🔹 Подтвердить оплату добавлено письмо
     elif data.startswith("paid:"):
         channel_key = data.split(":")[1]
         mark_as_paid_custom(user_id=user_id, channel_key=channel_key, payment_date=datetime.now().date().isoformat())
