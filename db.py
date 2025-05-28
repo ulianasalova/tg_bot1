@@ -139,52 +139,16 @@ def add_user(user_id, name, username=None):
     conn.commit()
     conn.close()
 
-def mark_as_paid(user_id: int):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-
-    # Получаем текущую активную запись пользователя по каналу
-    c.execute("""
-        SELECT channel_key, payment_date FROM user_channels
-        WHERE user_id = ?
-    """, (user_id,))
-    row = c.fetchone()
-
-    if row:
-        channel_key, old_date = row
-        new_date = datetime.now().date().isoformat()
-
-        # Обновляем дату оплаты в user_channels
-        c.execute("""
-            UPDATE user_channels
-            SET payment_date = ?
-            WHERE user_id = ? AND channel_key = ?
-        """, (new_date, user_id, channel_key))
-
-        # Логируем оплату
-        c.execute("""
-            INSERT INTO payment_log (user_id, channel_key, action, old_date, new_date, date_logged)
-            VALUES (?, ?, 'confirmed', ?, ?, ?)
-        """, (
-            user_id,
-            channel_key,
-            old_date,
-            new_date,
-            datetime.now().isoformat()
-        ))
-
-    conn.commit()
-    conn.close()
-
 from datetime import datetime, date
 import sqlite3
 
+
 def mark_as_paid_custom(
-    user_id: int,
-    channel_key: str,
-    payment_date: str,
-    admin_id: int = None,
-    action: str = None  # 'confirmed' или None
+        user_id: int,
+        channel_key: str,
+        payment_date: str,
+        admin_id: int = None,
+        action: str = None  # 'confirmed' или None
 ):
     # --- 0. Приведение payment_date к ISO-формату 'YYYY-MM-DD' ---
     if isinstance(payment_date, datetime):
@@ -213,7 +177,7 @@ def mark_as_paid_custom(
 
     # --- 2. Рассчитываем дату следующего напоминания ---
     next_reminder_date = (
-        datetime.fromisoformat(payment_date) + timedelta(days=27)
+            datetime.fromisoformat(payment_date) + timedelta(days=27)
     ).date().isoformat()
 
     # --- 3. Обновляем или вставляем в user_channels ---
@@ -429,44 +393,6 @@ def postpone_reminder(user_id: int, channel_key: str):
     finally:
         conn.close()
 
-
-def get_unpaid_users():
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-
-    c.execute("""
-        SELECT DISTINCT u.id, u.name
-        FROM users u
-        JOIN user_channels uc ON u.id = uc.user_id
-        WHERE uc.payment_status != 'paid'
-    """)
-
-    users = c.fetchall()
-    conn.close()
-    return users
-
-
-def get_unpaid_users(channel_keys: list[str]) -> list[tuple[int, str, str]]:
-    if not channel_keys:
-        return []
-
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-
-    placeholders = ",".join("?" for _ in channel_keys)
-    query = f"""
-        SELECT u.id, u.name, uc.channel_key
-        FROM users u
-        JOIN user_channels uc ON u.id = uc.user_id
-        WHERE uc.channel_key IN ({placeholders})
-        AND uc.payment_status != 'paid'
-    """
-    c.execute(query, channel_keys)
-    results = c.fetchall()
-    conn.close()
-    return results
-
-
 def get_all_users():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
@@ -539,40 +465,6 @@ def update_payment_date(user_id: int, channel_key: str, new_date: str, admin_id:
     conn.close()
 
 
-def update_user_channel(user_id: int, channel_key: str):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-
-    # Проверяем, есть ли уже такая подписка
-    c.execute("""
-        SELECT 1 FROM user_channels
-        WHERE user_id = ? AND channel_key = ?
-    """, (user_id, channel_key))
-    exists = c.fetchone()
-
-    # Если нет — добавляем
-    if not exists:
-        c.execute("""
-            INSERT INTO user_channels (user_id, channel_key)
-            VALUES (?, ?)
-        """, (user_id, channel_key))
-
-    conn.commit()
-    conn.close()
-
-def get_user_channel(user_id: int) -> list[str]:
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-    c.execute("""
-        SELECT channel_key FROM user_channels
-        WHERE user_id = ?
-    """, (user_id,))
-    rows = c.fetchall()
-    conn.close()
-
-    return [row[0] for row in rows]
-
-
 def get_user_by_id(user_id: int):
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
@@ -611,55 +503,6 @@ def get_user_by_id(user_id: int):
             } for sub in subscriptions
         ]
     }
-
-
-def get_users_for_admin_csv(admin_id: int):
-    conn = sqlite3.connect(DB_NAME)
-    c = conn.cursor()
-
-    # Проверим, является ли админ суперадмином
-    c.execute("SELECT is_superadmin, channels FROM admins WHERE id = ?", (admin_id,))
-    row = c.fetchone()
-
-    if not row:
-        conn.close()
-        return []
-
-    is_superadmin, channels_json = row
-    if is_superadmin:
-        # 👑 Суперадмин получает всех пользователей
-        c.execute("""
-            SELECT u.id, u.name, uc.payment_status, uc.payment_date, uc.previous_payment_date, uc.channel_key, u.username
-            FROM user_channels uc
-            JOIN users u ON u.id = uc.user_id
-        """)
-        users = c.fetchall()
-        conn.close()
-        return users
-
-    # 🧑‍💼 Обычный админ — только по своим каналам
-    try:
-        admin_channels = json.loads(channels_json)
-    except:
-        admin_channels = []
-
-    if not admin_channels:
-        conn.close()
-        return []
-
-    placeholders = ','.join(['?'] * len(admin_channels))
-    query = f"""
-        SELECT u.id, u.name, uc.status, uc.payment_date, uc.previous_payment_date, uc.channel_key, u.username
-        FROM user_channels uc
-        JOIN users u ON u.id = uc.user_id
-        WHERE uc.channel_key IN ({placeholders})
-    """
-    c.execute(query, admin_channels)
-    users = c.fetchall()
-
-    conn.close()
-    return users
-
 
 def add_user_channel(user_id: int, channel_key: str, start_date: str = None):
     conn = sqlite3.connect(DB_NAME)
@@ -757,7 +600,7 @@ def get_unpaid_users_with_channels():
     c = conn.cursor()
 
     c.execute("""
-        SELECT u.id, u.name, u.username, uc.channel_key
+        SELECT u.id, u.name, u.username, uc.channel_key, uc.payment_date
         FROM users u
         JOIN user_channels uc ON u.id = uc.user_id
         WHERE uc.payment_status != 'paid'
@@ -808,8 +651,8 @@ def is_payment_confirmed(user_id: int, channel_key: str) -> bool:
     conn.close()
     return result is not None
 
-def get_users_pending_confirmation():
 
+def get_users_pending_confirmation():
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
 
