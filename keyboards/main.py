@@ -22,7 +22,7 @@ def build_paid_button(channel_key=None):
 def build_user_confirm_button(user_id: int, channel_key: str):
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ Подтвердить оплату", callback_data=f"admin_confirm:{user_id}:{channel_key}")],
-        [InlineKeyboardButton("✉️ Написать пользователю", callback_data=f"message_user:{user_id}")]
+        [InlineKeyboardButton("✉️ Написать", callback_data=f"message_user:{user_id}")]
     ])
 
 def build_comeback_keyboard(channel_key: str):
@@ -90,6 +90,9 @@ def build_history_keyboard(user_id: int, status: str, channel_key: str, payment_
             buttons.append(
                 InlineKeyboardButton("✅ Подтвердить оплату", callback_data=f"admin_confirm:{user_id}:{channel_key}")
             )
+            buttons.append(
+                InlineKeyboardButton("✉️ Написать", callback_data=f"message_user:{user_id}")
+            )
 
     buttons.append(
         InlineKeyboardButton("📜 История", callback_data=f"user_log:{user_id}")
@@ -128,4 +131,3 @@ def build_admin_reply_keyboard():
         resize_keyboard=True,
         one_time_keyboard=False
     )
-
