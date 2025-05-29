@@ -83,6 +83,9 @@ def build_history_keyboard(user_id: int, status: str, channel_key: str, payment_
         buttons.append(
             InlineKeyboardButton("↩ Отменить", callback_data=f"admin_cancel:{user_id}:{channel_key}")
         )
+        buttons.append(
+            InlineKeyboardButton("✉️ Написать", callback_data=f"message_user:{user_id}")
+        )
 
     elif status == "not_paid":
         # 👇 Добавим кнопку подтверждения для новых пользователей (без даты оплаты)
