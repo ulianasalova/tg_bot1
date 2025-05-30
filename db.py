@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 import sqlite3
 from config import DB_NAME
 import json
-from logger import logger
 from utils.storage import fetch_channels
 
 def init_db():
@@ -600,7 +599,7 @@ def get_unpaid_users_with_channels():
     c = conn.cursor()
 
     c.execute("""
-        SELECT u.id, u.name, u.username, uc.channel_key, uc.payment_date
+        SELECT u.id, u.name, u.username, uc.payment_status, uc.channel_key, uc.payment_date
         FROM users u
         JOIN user_channels uc ON u.id = uc.user_id
         WHERE uc.payment_status != 'paid'
@@ -718,4 +717,3 @@ def mark_user_come_back(user_id: int, channel_key: str):
     """, (user_id, channel_key))
     conn.commit()
     conn.close()
-
