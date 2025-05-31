@@ -599,7 +599,7 @@ def get_unpaid_users_with_channels():
     c = conn.cursor()
 
     c.execute("""
-        SELECT u.id, u.name, u.username, uc.channel_key, uc.payment_date
+        SELECT u.id, u.name, uc.payment_status, u.username, uc.channel_key, uc.payment_date
         FROM users u
         JOIN user_channels uc ON u.id = uc.user_id
         WHERE uc.payment_status != 'paid'
