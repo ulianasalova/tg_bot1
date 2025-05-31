@@ -1,6 +1,9 @@
 from keyboards.main import build_user_cancel_button
 from utils.formatting import format_user_card_simple
 from keyboards.main import build_user_confirm_button
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+from utils.formatting import format_user_channel_card
+from keyboards.main import build_history_keyboard
 
 PAGE_SIZE = 10
 
@@ -20,12 +23,12 @@ async def send_paid_users_page(message, context):
         await message.reply_text("⚠️ На этой странице нет пользователей.")
         return
 
-    for user_id, name, status, username, channel_key, payment_date in page_users:
+    for user_id, name, payment_status, username, channel_key, payment_date in page_users:
         card = format_user_card_simple(user_id, name, username, channel_key, payment_date)
         await message.reply_text(
             card,
             parse_mode="HTML",
-            reply_markup=build_history_keyboard(user_id, status, channel_key, payment_date)
+            reply_markup=build_history_keyboard(user_id, payment_status, channel_key, payment_date)
         )
 
     # Кнопки навигации
@@ -96,12 +99,12 @@ async def send_unpaid_users_page(message, context):
         await message.reply_text("⚠️ На этой странице нет пользователей.")
         return
 
-    for user_id, name, username, channel_key, payment_date in page_users:
+    for user_id, name, status, username, channel_key, payment_date in page_users:
         text = format_user_card_simple(user_id, name, username, channel_key, payment_date)
         await message.reply_text(
             text=text,
             parse_mode="HTML",
-            reply_markup=build_user_confirm_button(user_id, channel_key)
+            reply_markup=build_history_keyboard(user_id, status, channel_key, payment_date)
         )
 
     # Кнопки навигации добавлено письмо
@@ -114,11 +117,7 @@ async def send_unpaid_users_page(message, context):
     if buttons:
         await message.reply_text("📄 Навигация:", reply_markup=InlineKeyboardMarkup([buttons]))
 
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton
-from utils.formatting import format_user_channel_card
-from keyboards.main import build_history_keyboard
 
-PAGE_SIZE = 10
 
 async def send_history_page(message, context):
     state = context.user_data.get("history_state")
@@ -158,7 +157,7 @@ async def send_history_page(message, context):
         await message.reply_text(
             text=card,
             parse_mode="HTML",
-            reply_markup=build_history_keyboard(user_id, payment_status, channel_key)
+            reply_markup=build_history_keyboard(user_id, payment_status, channel_key, payment_date)
         )
 
     # Кнопки пагинации
