@@ -550,7 +550,7 @@ def get_paid_users_for_admin(admin_id: int):
 
     if superadmin:
         c.execute("""
-            SELECT uc.user_id, u.name, u.username, uc.channel_key, uc.payment_date
+            SELECT uc.user_id, u.name, uc.payment_status, u.username, uc.channel_key, uc.payment_date
             FROM user_channels uc
             JOIN users u ON uc.user_id = u.id
             WHERE uc.payment_status = 'paid'
@@ -559,7 +559,7 @@ def get_paid_users_for_admin(admin_id: int):
     else:
         placeholders = ",".join("?" for _ in channels)
         c.execute(f"""
-            SELECT uc.user_id, u.name, u.username, uc.channel_key, uc.payment_date
+            SELECT uc.user_id, u.name, uc.payment_status, u.username, uc.channel_key, uc.payment_date
             FROM user_channels uc
             JOIN users u ON uc.user_id = u.id
             WHERE uc.payment_status = 'paid'
