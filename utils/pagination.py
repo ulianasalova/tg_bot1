@@ -96,12 +96,12 @@ async def send_unpaid_users_page(message, context):
         await message.reply_text("⚠️ На этой странице нет пользователей.")
         return
 
-    for user_id, name, status, username, channel_key, payment_date in page_users:
+    for user_id, name, username, channel_key, payment_date in page_users:
         text = format_user_card_simple(user_id, name, username, channel_key, payment_date)
         await message.reply_text(
             text=text,
             parse_mode="HTML",
-            reply_markup=build_history_keyboard(user_id, status, channel_key, payment_date)
+            reply_markup=build_user_confirm_button(user_id, channel_key)
         )
 
     # Кнопки навигации добавлено письмо
