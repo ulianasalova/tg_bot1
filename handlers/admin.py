@@ -97,14 +97,14 @@ async def list_unpaid(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # (user_id, name, channel_key) → теперь добавим username для вывода карточек
-    users = []
-    for user_id, name, channel_key, payment_date in raw_users:
-        try:
-            chat = await context.bot.get_chat(user_id)
-            username = chat.username
-        except:
-            username = None
-        users.append((user_id, name, username, channel_key, payment_date))
+    # users = []
+    # for user_id, name, status, channel_key, payment_date in raw_users:
+    #     try:
+    #         chat = await context.bot.get_chat(user_id)
+    #         username = chat.username
+    #     except:
+    #         username = None
+    #     users.append((user_id, name, status, username, channel_key, payment_date))
 
     # сохраняем в context
     context.user_data["unpaid_list"] = {
