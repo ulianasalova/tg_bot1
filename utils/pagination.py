@@ -1,12 +1,11 @@
 from keyboards.main import build_user_cancel_button
 from utils.formatting import format_user_card_simple
 from keyboards.main import build_user_confirm_button
-import logger
 
 PAGE_SIZE = 10
 
 
-def build_pagination_keyboard(page: int, total: int, prefix: str = "history_page", page_size: int = 10):
+def build_pagination_keyboard(page: int, total: int, prefix: str, page_size: int = 10):
     buttons = []
     if page > 0:
         buttons.append(InlineKeyboardButton("⬅ Назад", callback_data=f"{prefix}:prev"))
@@ -49,7 +48,6 @@ async def handle_pagination_callback(update, context):
     elif page_type == "unpaid_page":
         await send_unpaid_users_page(update.effective_chat, context)
     elif page_type == "history_page":
-        from handlers.admin import send_history_page
         await send_history_page(update.effective_chat, context)
 
 
@@ -74,14 +72,14 @@ async def send_paid_users_page(chat, context):
         await chat.send_message(
             card,
             parse_mode="HTML",
-            reply_markup=build_user_cancel_button(user_id, channel_key)
+            # reply_markup=build_user_cancel_button(user_id, channel_key)
         )
 
         # Кнопки навигации
         # И добавь кнопку навигации в конце
         nav_markup = InlineKeyboardMarkup([[
-            InlineKeyboardButton("⬅️ Назад", callback_data="unpaid_page:prev"),
-            InlineKeyboardButton("➡️ Вперёд", callback_data="unpaid_page:next"),
+            InlineKeyboardButton("⬅️ Назад", callback_data="paid_page:prev"),
+            InlineKeyboardButton("➡️ Вперёд", callback_data="paid_page:next"),
         ]])
         await chat.send_message("📄 Навигация:", reply_markup=nav_markup)
 
@@ -107,7 +105,7 @@ async def send_unpaid_users_page(chat, context):
         await chat.send_message(
             text=text,
             parse_mode="HTML",
-            reply_markup=build_user_confirm_button(user_id, channel_key)
+            # reply_markup=build_user_confirm_button(user_id, channel_key)
         )
 
     # И добавь кнопку навигации в конце
@@ -117,14 +115,12 @@ async def send_unpaid_users_page(chat, context):
     ]])
     await chat.send_message("📄 Навигация:", reply_markup=nav_markup)
 
-        # Кнопки навигации добавлено письмо
+       # Кнопки навигации добавлено письмо
 
 
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from utils.formatting import format_user_channel_card
 from keyboards.main import build_history_keyboard
-
-PAGE_SIZE = 10
 
 async def send_history_page(chat, context):
     state = context.user_data.get("history_state")
@@ -175,4 +171,4 @@ async def send_history_page(chat, context):
         nav_buttons.append(InlineKeyboardButton("➡️ Вперёд", callback_data="history_page:next"))
 
     if nav_buttons:
-        await chat.send_message("📄 Навигация:", reply_markup=InlineKeyboardMarkup([nav_buttons]))
+        await chat.send_message  ("📄 Навигация:", reply_markup=InlineKeyboardMarkup([nav_buttons]))
