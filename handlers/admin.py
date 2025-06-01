@@ -108,7 +108,7 @@ async def list_unpaid(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # сохраняем в context
     context.user_data["unpaid_list"] = {
-        "users": users,
+        "users": raw_users,
         "page": 0,
     }
 
@@ -137,63 +137,6 @@ async def list_paid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     # Показываем первую страницу
     await send_paid_users_page(update.effective_chat, context)
 
-from utils.formatting import format_user_card
-from utils.pagination import build_pagination_keyboard
-from keyboards.main import build_history_keyboard
-
-PAGE_SIZE = 10
-
-async def send_history_page(chat, context):
-    state = context.user_data.get("history_state")
-    if not state:
-        await chat.send_message("❌ Нет данных для отображения.")
-        return
-
-    page = state["page"]
-    users = state["users"]
-    start = page * PAGE_SIZE
-    end = start + PAGE_SIZE
-    current_users = users[start:end]
-
-    if not current_users:
-        await chat.send_message("⚠️ Нет данных на этой странице.")
-        return
-
-    for user in current_users:
-        user_id = user["user_id"]
-        name = user["name"]
-        status = user["payment_status"]
-        payment_date = user["payment_date"]
-        previous_date = user.get("previous_date")  # может быть None
-        channel_key = user["channel_key"]
-        username = user.get("username")  # может быть None
-
-        text = format_user_card(
-            user_id=user_id,
-            name=name,
-            status=status,
-            payment_date=payment_date,
-            previous_date=previous_date,
-            channel_key=channel_key,
-            username=username
-        )
-
-        await chat.send_message(
-            text=text,
-            reply_markup=build_history_keyboard(user_id, status, channel_key, payment_date),
-            parse_mode="HTML"
-        )
-
-    # ➕ Пагинация
-    keyboard = build_pagination_keyboard(
-        page=page,
-        total=len(users),
-        prefix="history_page",
-        page_size=PAGE_SIZE
-    )
-
-    if keyboard:
-        await chat.send_message("📄 Навигация по страницам:", reply_markup=keyboard)
 
 
 async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
