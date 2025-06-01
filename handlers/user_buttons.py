@@ -1,7 +1,8 @@
 from telegram import Update
 from keyboards.main import build_paid_button
 from telegram.ext import ContextTypes, CallbackQueryHandler
-from logger import logger
+import logging
+logging.basicConfig(level=logging.DEBUG)
 from keyboards.main import build_main_menu
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from utils.storage import fetch_channels
@@ -14,7 +15,7 @@ def add_main_menu_button(keyboard_rows):
 
 
 async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    logger.debug(f"Нажата кнопка: {update.callback_query.data}")
+    logging.info(f"Нажата кнопка: {update.callback_query.data}")
     query = update.callback_query
     await query.answer()
     user_id = query.from_user.id
@@ -64,7 +65,7 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
         channel_key = data.split(":")[1]
         await show_payment_details(query, context, user, channel_key)
 
-    # 🔹 Подтвердить оплату добавлено письмо
+    # 🔹 Подтвердить оплату добавлено письмо и юзернэйм
     elif data.startswith("paid:"):
         channel_key = data.split(":")[1]
         mark_as_paid_custom(user_id=user_id, channel_key=channel_key, payment_date=datetime.now().date().isoformat())
@@ -80,7 +81,7 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
         admin_ids = get_admins_for_channel(channel_key)
 
         text = (
-            f"👤 Пользователь {user.first_name} (ID: {user_id}) сообщил об оплате.\n"
+            f"👤 Пользователь {user.first_name} (ID: {user_id}), username @{user.username} сообщил об оплате.\n"
             f"📌 Канал: {channel_title}"
         )
         await notify_admins(context.bot, text, admin_ids, parse_mode=None)
