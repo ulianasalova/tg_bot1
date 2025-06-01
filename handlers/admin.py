@@ -112,7 +112,7 @@ async def list_unpaid(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "page": 0,
     }
 
-    await send_unpaid_users_page(update.message, context)
+    await send_unpaid_users_page(update.effective_chat, context)
 
 
 async def list_paid(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -135,7 +135,7 @@ async def list_paid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
 
     # Показываем первую страницу
-    await send_paid_users_page(update.message, context)
+    await send_paid_users_page(update.effective_chat, context)
 
 from utils.formatting import format_user_card
 from utils.pagination import build_pagination_keyboard
@@ -261,7 +261,7 @@ async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
 
     from utils.pagination import send_history_page
-    await send_history_page(message, context)
+    await send_history_page(update.effective_chat, context)
 
     # 🔰 Заголовок
     if channel_filter:
