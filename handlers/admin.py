@@ -98,13 +98,13 @@ async def list_unpaid(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     # (user_id, name, channel_key) → теперь добавим username для вывода карточек
     # users = []
-    # for user_id, name, status, channel_key, payment_date in raw_users:
+    # for user_id, name, payment_status, channel_key, payment_date in raw_users:
     #     try:
     #         chat = await context.bot.get_chat(user_id)
     #         username = chat.username
     #     except:
     #         username = None
-    #     users.append((user_id, name, status, username, channel_key, payment_date))
+    #     users.append((user_id, name, payment_status, username, channel_key, payment_date))
 
     # сохраняем в context
     context.user_data["unpaid_list"] = {
@@ -143,10 +143,10 @@ from keyboards.main import build_history_keyboard
 
 PAGE_SIZE = 10
 
-async def send_history_page(message, context):
+async def send_history_page(chat, context):
     state = context.user_data.get("history_state")
     if not state:
-        await message.reply_text("❌ Нет данных для отображения.")
+        await chat.send_message("❌ Нет данных для отображения.")
         return
 
     page = state["page"]
@@ -156,7 +156,7 @@ async def send_history_page(message, context):
     current_users = users[start:end]
 
     if not current_users:
-        await message.reply_text("⚠️ Нет данных на этой странице.")
+        await chat.send_message("⚠️ Нет данных на этой странице.")
         return
 
     for user in current_users:
@@ -178,7 +178,7 @@ async def send_history_page(message, context):
             username=username
         )
 
-        await message.reply_text(
+        await chat.send_message(
             text=text,
             reply_markup=build_history_keyboard(user_id, status, channel_key, payment_date),
             parse_mode="HTML"
@@ -193,7 +193,7 @@ async def send_history_page(message, context):
     )
 
     if keyboard:
-        await message.reply_text("📄 Навигация по страницам:", reply_markup=keyboard)
+        await chat.send_message("📄 Навигация по страницам:", reply_markup=keyboard)
 
 
 async def history(update: Update, context: ContextTypes.DEFAULT_TYPE):

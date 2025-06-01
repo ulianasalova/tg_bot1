@@ -34,7 +34,8 @@ def build_comeback_keyboard(channel_key: str):
 
 def build_user_cancel_button(user_id: int, channel_key: str):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("↩ Отменить оплату", callback_data=f"admin_cancel:{user_id}:{channel_key}")]
+        [InlineKeyboardButton("↩ Отменить оплату", callback_data=f"admin_cancel:{user_id}:{channel_key}")],
+        [InlineKeyboardButton("✉️ Написать", callback_data=f"message_user:{user_id}")]
     ])
 
 def build_admin_panel():

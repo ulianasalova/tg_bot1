@@ -1,42 +1,10 @@
 from keyboards.main import build_user_cancel_button
 from utils.formatting import format_user_card_simple
 from keyboards.main import build_user_confirm_button
+import logger
 
 PAGE_SIZE = 10
 
-async def send_paid_users_page(message, context):
-    state = context.user_data.get("paid_list")
-    if not state:
-        await message.reply_text("❌ Нет данных для отображения.")
-        return
-
-    users = state["users"]
-    page = state["page"]
-    start = page * PAGE_SIZE
-    end = start + PAGE_SIZE
-    page_users = users[start:end]
-
-    if not page_users:
-        await message.reply_text("⚠️ На этой странице нет пользователей.")
-        return
-
-    for user_id, name, payment_status, username, channel_key, payment_date in page_users:
-        card = format_user_card_simple(user_id, name, username, channel_key, payment_date)
-        await message.reply_text(
-            card,
-            parse_mode="HTML",
-            reply_markup=build_history_keyboard(user_id, payment_status, channel_key, payment_date)
-        )
-
-    # Кнопки навигации
-    buttons = []
-    if page > 0:
-        buttons.append(InlineKeyboardButton("⬅️ Назад", callback_data="paid_page:prev"))
-    if end < len(users):
-        buttons.append(InlineKeyboardButton("➡️ Вперёд", callback_data="paid_page:next"))
-
-    if buttons:
-        await message.reply_text("📄 Навигация:", reply_markup=InlineKeyboardMarkup([buttons]))
 
 def build_pagination_keyboard(page: int, total: int, prefix: str = "history_page", page_size: int = 10):
     buttons = []
@@ -72,18 +40,23 @@ async def handle_pagination_callback(update, context):
     elif direction == "prev" and state["page"] > 0:
         state["page"] -= 1
 
+    # Удаляем старую панель навигации (где была кнопка "вперёд/назад")
+    await query.message.delete()
+
+    # Вызываем функцию отображения страницы
     if page_type == "paid_page":
-        await send_paid_users_page(query.message, context)
+        await send_paid_users_page(update.effective_chat, context)
     elif page_type == "unpaid_page":
-        await send_unpaid_users_page(query.message, context)
+        await send_unpaid_users_page(update.effective_chat, context)
     elif page_type == "history_page":
         from handlers.admin import send_history_page
-        await send_history_page(query.message, context)
+        await send_history_page(update.effective_chat, context)
 
-async def send_unpaid_users_page(message, context):
-    state = context.user_data.get("unpaid_list")
+
+async def send_paid_users_page(chat, context):
+    state = context.user_data.get("paid_list")
     if not state:
-        await message.reply_text("❌ Нет данных для отображения.")
+        await chat.send_message("❌ Нет данных для отображения.")
         return
 
     users = state["users"]
@@ -93,26 +66,59 @@ async def send_unpaid_users_page(message, context):
     page_users = users[start:end]
 
     if not page_users:
-        await message.reply_text("⚠️ На этой странице нет пользователей.")
+        await chat.send_message("⚠️ На этой странице нет пользователей.")
         return
 
     for user_id, name, payment_status, username, channel_key, payment_date in page_users:
-        text = format_user_card_simple(user_id, name, username, channel_key, payment_date)
-        await message.reply_text(
-            text=text,
+        card = format_user_card_simple(user_id, name, username, channel_key, payment_date)
+        await chat.send_message(
+            card,
             parse_mode="HTML",
-            reply_markup=build_history_keyboard(user_id, payment_status, channel_key, payment_date)
+            reply_markup=build_user_cancel_button(user_id, channel_key)
         )
 
-    # Кнопки навигации добавлено письмо
-    buttons = []
-    if page > 0:
-        buttons.append(InlineKeyboardButton("⬅️ Назад", callback_data="unpaid_page:prev"))
-    if end < len(users):
-        buttons.append(InlineKeyboardButton("➡️ Вперёд", callback_data="unpaid_page:next"))
+        # Кнопки навигации
+        # И добавь кнопку навигации в конце
+        nav_markup = InlineKeyboardMarkup([[
+            InlineKeyboardButton("⬅️ Назад", callback_data="unpaid_page:prev"),
+            InlineKeyboardButton("➡️ Вперёд", callback_data="unpaid_page:next"),
+        ]])
+        await chat.send_message("📄 Навигация:", reply_markup=nav_markup)
 
-    if buttons:
-        await message.reply_text("📄 Навигация:", reply_markup=InlineKeyboardMarkup([buttons]))
+
+async def send_unpaid_users_page(chat, context):
+    state = context.user_data.get("unpaid_list")
+    if not state:
+        await chat.send_message("❌ Нет данных для отображения.")
+        return
+
+    users = state["users"]
+    page = state["page"]
+    start = page * PAGE_SIZE
+    end = start + PAGE_SIZE
+    page_users = users[start:end]
+
+    if not page_users:
+        await chat.send_message("⚠️ На этой странице нет пользователей.")
+        return
+
+    for user_id, name, status, username, channel_key, payment_date in page_users:
+        text = format_user_card_simple(user_id, name, username, channel_key, payment_date)
+        await chat.send_message(
+            text=text,
+            parse_mode="HTML",
+            reply_markup=build_user_confirm_button(user_id, channel_key)
+        )
+
+    # И добавь кнопку навигации в конце
+    nav_markup = InlineKeyboardMarkup([[
+        InlineKeyboardButton("⬅️ Назад", callback_data="unpaid_page:prev"),
+        InlineKeyboardButton("➡️ Вперёд", callback_data="unpaid_page:next"),
+    ]])
+    await chat.send_message("📄 Навигация:", reply_markup=nav_markup)
+
+        # Кнопки навигации добавлено письмо
+
 
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from utils.formatting import format_user_channel_card
