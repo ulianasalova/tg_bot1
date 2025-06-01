@@ -126,10 +126,10 @@ from keyboards.main import build_history_keyboard
 
 PAGE_SIZE = 10
 
-async def send_history_page(message, context):
+async def send_history_page(chat, context):
     state = context.user_data.get("history_state")
     if not state:
-        await message.reply_text("❌ Нет данных для отображения.")
+        await chat.send_message("❌ Нет данных для отображения.")
         return
 
     users = state["users"]
@@ -139,7 +139,7 @@ async def send_history_page(message, context):
     page_users = users[start:end]
 
     if not page_users:
-        await message.reply_text("⚠️ На этой странице нет пользователей.")
+        await chat.send_message("⚠️ На этой странице нет пользователей.")
         return
 
     for user in page_users:
@@ -161,7 +161,7 @@ async def send_history_page(message, context):
             previous_date=previous_date
         )
 
-        await message.reply_text(
+        await chat.send_message(
             text=card,
             parse_mode="HTML",
             reply_markup=build_history_keyboard(user_id, payment_status, channel_key)
@@ -175,4 +175,4 @@ async def send_history_page(message, context):
         nav_buttons.append(InlineKeyboardButton("➡️ Вперёд", callback_data="history_page:next"))
 
     if nav_buttons:
-        await message.reply_text("📄 Навигация:", reply_markup=InlineKeyboardMarkup([nav_buttons]))
+        await chat.send_message("📄 Навигация:", reply_markup=InlineKeyboardMarkup([nav_buttons]))
