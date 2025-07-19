@@ -1,18 +1,16 @@
 import asyncio
 import nest_asyncio
-from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, CallbackQueryHandler, filters
-from telegram import BotCommand, BotCommandScopeDefault, BotCommandScopeChat
+from telegram import Update, BotCommand, BotCommandScopeDefault, BotCommandScopeChat
+from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 from config import config
 from db import init_db, create_indexes, get_all_admins
 from handlers.start import start
 from handlers.admin import get_admin_handlers
-# Пользовательские кнопки (inline)
 from handlers.user_buttons import get_user_button_handler
-# Админские кнопки (inline)
 from handlers.admin_buttons import get_admin_button_handler
-# Текстовые кнопки (menu)
 from handlers.text_buttons import handle_text_buttons
-# Обновление даты оплаты
+from handlers.admin_buttons import message_user_callback, send_text_to_user
+from handlers.payments import setup_payment_handlers
 from handlers.update_payment import (
     handle_update_pay_command,
     handle_name_input,
@@ -22,9 +20,8 @@ from handlers.update_payment import (
 )
 from utils.scheduler import start_scheduler
 from utils.pagination import handle_pagination_callback
-from telegram.ext import  CommandHandler, MessageHandler, CallbackQueryHandler, filters
-
-nest_asyncio.apply()
+from fastapi import FastAPI, Request, Response, status
+from contextlib import asynccontextmanager
 from logger import setup_logging
 import logging
 
@@ -33,17 +30,27 @@ setup_logging()
 
 # Получаем логгер для текущего модуля
 logger = logging.getLogger(__name__)
+# другие импорты...
 
-async def setup_bot_commands(app):
-    # Команды для всех пользователей
-    await app.bot.set_my_commands(
-        [
-            BotCommand("start", "Запустить бота"),
-        ],
+telegram_app = ApplicationBuilder().token(config.BOT_TOKEN).build()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # --- STARTUP ---
+    init_db()
+    create_indexes()
+
+    await telegram_app.initialize()
+    await telegram_app.start()
+
+    await telegram_app.bot.delete_webhook(drop_pending_updates=True)
+    setup_payment_handlers(app)
+    await telegram_app.bot.set_my_commands(
+        [BotCommand("start", "Запустить бота")],
         scope=BotCommandScopeDefault()
     )
 
-    # Команды для админов из таблицы admins
+    admins = get_all_admins()
     admin_commands = [
         BotCommand("admin", "⚙ Админ-панель"),
         BotCommand("invite", "📩 Приглашение в канал"),
@@ -51,46 +58,44 @@ async def setup_bot_commands(app):
         BotCommand("broadcast", "📢 Рассылка подписчикам"),
         BotCommand("start", "Запустить бота"),
     ]
-
-    admins = get_all_admins()
     for admin in admins:
-        admin_id = admin[0]
-        await app.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin_id))
-from handlers.admin import update_pay_command
+        await telegram_app.bot.set_my_commands(admin_commands, scope=BotCommandScopeChat(chat_id=admin[0]))
 
-from handlers.payments import setup_payment_handlers
+    telegram_app.add_handler(CallbackQueryHandler(handle_user_selected, pattern=r"^select_user:"))
+    telegram_app.add_handler(CallbackQueryHandler(handle_channel_selected, pattern=r"^select_channel:"))
+    telegram_app.add_handler(CallbackQueryHandler(handle_pagination_callback, pattern=r"^(paid_page|unpaid_page|history_page):(prev|next)$"))
+    telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, send_text_to_user))  # 🔹 СООБЩЕНИЕ ПОЛЬЗОВАТЕЛЮ
+    telegram_app.add_handler(CallbackQueryHandler(message_user_callback, pattern=r"^message_user:\d+$"))  # 🔹 КНОПКА
 
-# Основная точка входа
-async def main():
-    init_db()
-    create_indexes()
+    telegram_app.add_handler(get_admin_button_handler())
+    telegram_app.add_handler(get_user_button_handler())
+    telegram_app.add_handler(CommandHandler("start", start))
+    telegram_app.add_handler(CommandHandler("update_pay", handle_update_pay_command))
 
-    app = ApplicationBuilder().token(config.BOT_TOKEN).build()
-    await app.bot.delete_webhook(drop_pending_updates=True)
+    telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name_input))
+    telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_date_input))
+    telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_buttons))
 
-    await setup_bot_commands(app)
-    start_scheduler(app.bot)
-    setup_payment_handlers(app)
-        # --- Обработчики ---
-    app.add_handler(get_admin_button_handler())  # 💥 ВЕРХ!
-    app.add_handler(get_user_button_handler())
-    app.add_handler(CallbackQueryHandler(handle_user_selected, pattern=r"^select_user:"))
-    app.add_handler(CallbackQueryHandler(handle_channel_selected, pattern=r"^select_channel:"))
-    app.add_handler(CallbackQueryHandler(handle_pagination_callback, pattern=r"^(paid_page|unpaid_page|history_page):(prev|next)$"))
-    app.add_handler(CommandHandler("start", start))
-        # Обновление оплаты вручную
-    app.add_handler(CommandHandler("update_pay", handle_update_pay_command))
-     # Ввод имени и даты
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name_input))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_date_input))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_buttons))
 
-    # Дополнительные админ-команды (например, /broadcast и т.д.)
     for handler in get_admin_handlers():
-        app.add_handler(handler)
+        telegram_app.add_handler(handler)
 
-    await app.run_polling(close_loop=False)
+    webhook_url = f"https://{config.WEBHOOK_HOST}/webhook"
+    await telegram_app.bot.set_webhook(url=webhook_url)
 
-# Запуск
-if __name__ == "__main__":
-    asyncio.run(main())
+    yield  # 👈 здесь запускается сервер
+
+
+    # --- SHUTDOWN ---
+    await telegram_app.stop()
+    await telegram_app.shutdown()
+
+# Создаем FastAPI с новым lifespan
+app = FastAPI(lifespan=lifespan)
+
+@app.post("/webhook")
+async def webhook_handler(request: Request):
+    data = await request.json()
+    update = Update.de_json(data, bot=telegram_app.bot)
+    await telegram_app.process_update(update)
+    return Response(status_code=status.HTTP_200_OK)
