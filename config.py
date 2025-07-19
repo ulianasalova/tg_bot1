@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-class Config:
+class сonfig:
     ENV = os.getenv("ENV", "dev")
     BOT_TOKEN = os.getenv("BOT_TOKEN")
     WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
