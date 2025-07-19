@@ -33,7 +33,6 @@ async def lifespan(app: FastAPI):
     # --- STARTUP ---
     init_db()
     create_indexes()
-    setup_payment_handlers(app)
     await telegram_app.initialize()
     await telegram_app.start()
 
