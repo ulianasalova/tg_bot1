@@ -83,7 +83,7 @@ def start_scheduler(bot):
         args=[bot]
     )
     scheduler.start()
-    print("✅ Планировщик запущен: каждый день в 17:10 по Москве")
+    print("✅ Планировщик запущен: каждый день в 11:30 по Москве")
 
 
 async def notify_admin_about_come_back(bot, user_id: int, user_name: str):
