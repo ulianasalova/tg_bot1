@@ -3,7 +3,7 @@ import nest_asyncio
 from telegram import Update, BotCommand, BotCommandScopeDefault, BotCommandScopeChat
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters
 
-from config import Config
+from config import config
 from db import init_db, create_indexes, get_all_admins
 from handlers.start import start
 from handlers.admin import get_admin_handlers
@@ -25,7 +25,7 @@ from fastapi import FastAPI, Request, Response, status
 from contextlib import asynccontextmanager
 # другие импорты...
 
-telegram_app = ApplicationBuilder().token(Config.BOT_TOKEN).build()
+telegram_app = ApplicationBuilder().token(config.BOT_TOKEN).build()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -73,7 +73,7 @@ async def lifespan(app: FastAPI):
     for handler in get_admin_handlers():
         telegram_app.add_handler(handler)
 
-    webhook_url = f"https://{Config.WEBHOOK_HOST}/webhook"
+    webhook_url = f"https://{config.WEBHOOK_HOST}/webhook"
     await telegram_app.bot.set_webhook(url=webhook_url)
 
     yield  # 👈 здесь запускается сервер
@@ -92,3 +92,4 @@ async def webhook_handler(request: Request):
     update = Update.de_json(data, bot=telegram_app.bot)
     await telegram_app.process_update(update)
     return Response(status_code=status.HTTP_200_OK)
+
