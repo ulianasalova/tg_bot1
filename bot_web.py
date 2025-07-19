@@ -32,7 +32,7 @@ setup_logging()
 logger = logging.getLogger(__name__)
 # другие импорты...
 
-telegram_app = ApplicationBuilder().token(Config.BOT_TOKEN).build()
+telegram_app = ApplicationBuilder().token(config.BOT_TOKEN).build()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -80,7 +80,7 @@ async def lifespan(app: FastAPI):
     for handler in get_admin_handlers():
         telegram_app.add_handler(handler)
 
-    webhook_url = f"https://{Config.WEBHOOK_HOST}/webhook"
+    webhook_url = f"https://{config.WEBHOOK_HOST}/webhook"
     await telegram_app.bot.set_webhook(url=webhook_url)
 
     yield  # 👈 здесь запускается сервер
