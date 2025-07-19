@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-class сonfig:
+class Сonfig:
     ENV = os.getenv("ENV", "dev")
     BOT_TOKEN = os.getenv("BOT_TOKEN")
     WEBHOOK_HOST = os.getenv("WEBHOOK_HOST")
@@ -17,5 +17,5 @@ class сonfig:
     GYM_CHANNEL_ID = int(os.getenv("GYM_CHANNEL_ID"))
     FUNCTIONAL_CHANNEL_ID = int(os.getenv("FUNCTIONAL_CHANNEL_ID"))
 
-
+config = Config()
 DB_NAME = os.getenv("DB_NAME", "reminder.db")
