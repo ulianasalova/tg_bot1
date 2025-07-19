@@ -2,8 +2,7 @@ import asyncio
 import nest_asyncio
 from telegram import Update, BotCommand, BotCommandScopeDefault, BotCommandScopeChat
 from telegram.ext import ApplicationBuilder, CommandHandler, CallbackQueryHandler, MessageHandler, filters
-
-from config import сonfig
+from config import config
 from db import init_db, create_indexes, get_all_admins
 from handlers.start import start
 from handlers.admin import get_admin_handlers
@@ -11,7 +10,7 @@ from handlers.user_buttons import get_user_button_handler
 from handlers.admin_buttons import get_admin_button_handler
 from handlers.text_buttons import handle_text_buttons
 from handlers.admin_buttons import message_user_callback, send_text_to_user
-
+from handlers.payments import setup_payment_handlers
 from handlers.update_payment import (
     handle_update_pay_command,
     handle_name_input,
@@ -23,9 +22,17 @@ from utils.scheduler import start_scheduler
 from utils.pagination import handle_pagination_callback
 from fastapi import FastAPI, Request, Response, status
 from contextlib import asynccontextmanager
+from logger import setup_logging
+import logging
+
+# Инициализация логирования
+setup_logging()
+
+# Получаем логгер для текущего модуля
+logger = logging.getLogger(__name__)
 # другие импорты...
 
-telegram_app = ApplicationBuilder().token(сonfig.BOT_TOKEN).build()
+telegram_app = ApplicationBuilder().token(config.BOT_TOKEN).build()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -37,7 +44,8 @@ async def lifespan(app: FastAPI):
     await telegram_app.start()
 
     await telegram_app.bot.delete_webhook(drop_pending_updates=True)
-
+    setup_payment_handlers(telegram_app)
+    start_scheduler(telegram_app.bot)
     await telegram_app.bot.set_my_commands(
         [BotCommand("start", "Запустить бота")],
         scope=BotCommandScopeDefault()
@@ -73,7 +81,7 @@ async def lifespan(app: FastAPI):
     for handler in get_admin_handlers():
         telegram_app.add_handler(handler)
 
-    webhook_url = f"https://{сonfig.WEBHOOK_HOST}/webhook"
+    webhook_url = f"https://{config.WEBHOOK_HOST}/webhook"
     await telegram_app.bot.set_webhook(url=webhook_url)
 
     yield  # 👈 здесь запускается сервер
