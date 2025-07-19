@@ -43,7 +43,23 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
         if len(channels) == 1:
             # Один канал — сразу реквизиты
             channel_key = channels[0]["channel_key"]
-            await show_payment_details(query, context, user, channel_key)
+
+            # Проверка на swimmasters
+            if channel_key == "swimmasters":
+                channel = fetch_channels()[channel_key]  # Получаем данные канала
+                await query.edit_message_text(
+                    f"✅ Вы выбрали канал:\n<b>{channel['title']}</b>\n"
+                    "Для оплаты подписки используйте кнопку ниже или команду /buy",
+                    parse_mode="HTML",
+                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                        [InlineKeyboardButton(
+                            text="💳 Оплатить (/buy)",
+                            callback_data="buy_subscription"
+                        )]
+                    ])
+                )
+            else:
+                await show_payment_details(query, context, user, channel_key)
         else:
             # Несколько каналов — кнопки выбора
             keyboard_rows = [
@@ -63,7 +79,26 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
     # 🔹 Оплата по выбранному каналу
     elif data.startswith("pay_channel:"):
         channel_key = data.split(":")[1]
-        await show_payment_details(query, context, user, channel_key)
+
+        if channel_key == "swimmasters":
+            channel = fetch_channels()[channel_key]  # Получаем данные канала
+            await query.edit_message_text(
+                f"✅ Вы выбрали канал:\n<b>{channel['title']}</b>\n"
+                "Для оплаты подписки используйте кнопку ниже или команду /buy",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(
+                        text="💳 Оплатить (/buy)",
+                        callback_data="buy_subscription"
+                    )],
+                    [InlineKeyboardButton(
+                        text="⬅️ Назад",
+                        callback_data="pay"
+                    )]
+                ])
+            )
+        else:
+            await show_payment_details(query, context, user, channel_key)
 
     # 🔹 Подтвердить оплату добавлено письмо и юзернэйм
     elif data.startswith("paid:"):
@@ -218,23 +253,33 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
         if channel_key not in fetch_channels():
             await query.answer("❌ Канал не найден", show_alert=True)
             return
-
         from db import add_user_channel
         add_user_channel(user.id, channel_key)
-
         channel = fetch_channels()[channel_key]
-        await query.edit_message_text(
-            f"✅ Вы выбрали канал:\n<b>{channel['title']}</b>\nПосле оплаты подписки вы получите к нему доступ!",
-            parse_mode="HTML",
-            # reply_markup=build_paid_button(channel_key)
-        )
-
-        await query.message.reply_text(
-            text="💳 Отлично! Теперь можно перейти к оплате подписки 👇",
-            reply_markup=add_main_menu_button([
-                [InlineKeyboardButton("💳 Оплатить", callback_data=f"pay_channel:{channel_key}")]
-            ])
-        )
+        if channel_key == "swimmasters":
+            await query.edit_message_text(
+                f"✅ Вы выбрали канал:\n<b>{channel['title']}</b>\n"
+                "Для оплаты подписки используйте кнопку ниже или команду /buy",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(
+                        text="💳 Оплатить (/buy)",
+                        callback_data="buy_subscription"
+                    )]
+                ])
+            )
+        else:
+            await query.edit_message_text(
+                f"✅ Вы выбрали канал:\n<b>{channel['title']}</b>\n"
+                "После оплаты подписки вы получите к нему доступ!",
+                parse_mode="HTML"
+            )
+            await query.message.reply_text(
+                text="💳 Отлично! Теперь можно перейти к оплате подписки 👇",
+                reply_markup=add_main_menu_button([
+                    [InlineKeyboardButton("💳 Оплатить", callback_data=f"pay_channel:{channel_key}")]
+                ])
+            )
 
 # 📌 Вспомогательная функция: показать реквизиты оплаты
 async def show_payment_details(query, context, user, channel_key):
