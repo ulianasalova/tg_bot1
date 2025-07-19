@@ -11,6 +11,7 @@ from handlers.user_buttons import get_user_button_handler
 from handlers.admin_buttons import get_admin_button_handler
 from handlers.text_buttons import handle_text_buttons
 from handlers.admin_buttons import message_user_callback, send_text_to_user
+from handlers.payments import setup_payment_handlers
 
 from handlers.update_payment import (
     handle_update_pay_command,
@@ -32,7 +33,7 @@ async def lifespan(app: FastAPI):
     # --- STARTUP ---
     init_db()
     create_indexes()
-
+    setup_payment_handlers(app)
     await telegram_app.initialize()
     await telegram_app.start()
 
@@ -92,4 +93,3 @@ async def webhook_handler(request: Request):
     update = Update.de_json(data, bot=telegram_app.bot)
     await telegram_app.process_update(update)
     return Response(status_code=status.HTTP_200_OK)
-
