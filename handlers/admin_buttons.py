@@ -4,11 +4,12 @@ from keyboards.main import build_channel_filter_keyboard, build_history_keyboard
 from db import is_admin, mark_as_paid_custom, mark_as_unpaid
 from datetime import datetime, timedelta
 import csv
-from logger import logger
 from utils.storage import fetch_channels
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler, MessageHandler, filters
+import logging
 
+logger = logging.getLogger(__name__)
 # ✅ Обработчик кнопок от администратора
 
 async def handle_admin_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE):

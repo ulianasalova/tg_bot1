@@ -1,6 +1,8 @@
 from datetime import datetime, timedelta
 import sqlite3
-from config import DB_NAME
+from config import config
+
+DB_NAME = config.DB_NAME
 import json
 from utils.storage import fetch_channels
 
@@ -324,8 +326,8 @@ def get_admin_by_id(admin_id: int):
 
 
 
-from logger import logger  # добавь этот импорт вверху файла
-
+import logging
+logger = logging.getLogger(__name__)
 def get_admins_for_channel(channel_key: str) -> list[int]:
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
@@ -347,8 +349,6 @@ def get_admins_for_channel(channel_key: str) -> list[int]:
 
 
     return admin_ids
-
-
 
 def is_admin(user_id: int) -> bool:
     admin = get_admin_by_id(user_id)
