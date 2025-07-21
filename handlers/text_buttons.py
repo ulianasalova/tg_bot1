@@ -1,6 +1,6 @@
 from telegram import Update
 from telegram.ext import ContextTypes
-from config import Config
+from config import config
 from keyboards.main import build_channel_keyboard
 from db import get_user_by_id, get_user_channels
 from datetime import datetime, timedelta
