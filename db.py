@@ -178,7 +178,7 @@ def mark_as_paid_custom(
 
     # --- 2. Рассчитываем дату следующего напоминания ---
     next_reminder_date = (
-            datetime.fromisoformat(payment_date) + timedelta(days=27)
+            datetime.fromisoformat(payment_date) + timedelta(days=30)
     ).date().isoformat()
 
     # --- 3. Обновляем или вставляем в user_channels ---
@@ -602,7 +602,8 @@ def get_unpaid_users_with_channels():
         SELECT u.id, u.name, uc.payment_status, u.username, uc.channel_key, uc.payment_date
         FROM users u
         JOIN user_channels uc ON u.id = uc.user_id
-        WHERE uc.payment_status != 'paid'
+        WHERE uc.next_reminder_date IS NOT NULL
+        AND strftime('%Y-%m-%d', uc.next_reminder_date) <= strftime('%Y-%m-%d', 'now')
     """)
 
     users = c.fetchall()
@@ -674,10 +675,6 @@ def get_users_pending_confirmation():
             )
         ) pl ON pl.user_id = uc.user_id AND pl.channel_key = uc.channel_key
         WHERE (pl.action IS NULL)
-          AND (
-              uc.payment_date IS NULL 
-              OR DATE(pl.new_date) != DATE(uc.payment_date)
-          )
     """)
 
     results = c.fetchall()

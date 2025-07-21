@@ -111,7 +111,7 @@ async def list_unpaid(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "users": raw_users,
         "page": 0,
     }
-
+    from utils.pagination import send_unpaid_users_page
     await send_unpaid_users_page(update.effective_chat, context)
 
 
@@ -135,6 +135,7 @@ async def list_paid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     }
 
     # Показываем первую страницу
+    from utils.pagination import send_paid_users_page
     await send_paid_users_page(update.effective_chat, context)
 
 

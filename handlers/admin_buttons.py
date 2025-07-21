@@ -163,21 +163,22 @@ async def handle_admin_buttons(update: Update, context: ContextTypes.DEFAULT_TYP
 
 
 
-
     elif data.startswith("admin_view:"):
         view = data.split(":")[1]
-        args = []
         if view == "paid":
-            args = ["only=paid"]
-        elif view == "not_paid":
-            args = ["only=not_paid"]
-        elif view == "latest":
-            args = ["only=new_users"]  # ← вот это ключевая строка
-        update = Update.de_json(update.to_dict(), context.bot)
-        context.args = args
-        from handlers.admin import history
-        await history(update, context)
+            from handlers.admin import list_paid
+            await list_paid(update, context)  # Прямой вызов list_unpaid
 
+        elif view == "not_paid":
+            from handlers.admin import list_unpaid
+            await list_unpaid(update, context)  # Прямой вызов list_unpaid
+
+        elif view == "latest":
+            args = ["only=new_users"]
+            update = Update.de_json(update.to_dict(), context.bot)
+            context.args = args
+            from handlers.admin import history
+            await history(update, context)
 
 
     elif data == "admin_stats":

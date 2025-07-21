@@ -2,109 +2,108 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
 import pytz
-
 from datetime import datetime, timedelta
-from db import get_all_users, mark_user_as_expired
+import html
+
+from db import get_all_users, get_admins_for_channel
 from keyboards.main import build_reminder_keyboard, build_comeback_keyboard
 
-# Устанавливаем московский часовой пояс
 moscow = pytz.timezone("Europe/Moscow")
-
 scheduler = AsyncIOScheduler()
 
 
 async def send_reminders(bot):
+    """Асинхронная отправка напоминаний"""
     print(f"🕒 [{datetime.now()}] Запуск планового напоминания")
     today = datetime.now().date()
     users = get_all_users()
-    import html
+
     for user in users:
         user_id, name, status, payment_date_str, next_reminder_str, channel_key, channel_title = user
         safe_title = html.escape(channel_title)
-        # 🛡️ Пропускаем пользователей со статусом "come_back"
+
         if status == "come_back":
             continue
+
         try:
-            if status == "paid" and payment_date_str:
-                payment_date = datetime.fromisoformat(payment_date_str).date()
-                remind_date = payment_date + timedelta(days=28)
-                expire_date = payment_date + timedelta(days=31)
+            if status == "paid" and next_reminder_str:
+                payment_date = datetime.fromisoformat(next_reminder_str).date()
+                remind_date = payment_date - timedelta(days=2)
+                expire_date = payment_date + timedelta(days=1)
 
                 if remind_date <= today < expire_date:
                     await bot.send_message(
                         chat_id=user_id,
-                        text=(
-                            f"🏊‍♀️ Привет, {html.escape(name)}!\n"
-                            f"Скоро заканчивается твоя подписка.\n"
-                            f"на канал <b>{safe_title}</b>\n"
-                            "Пожалуйста, продли её 💳"
-                        ),
+                        text=f"🏊‍♀️ Привет, {html.escape(name)}!\nСкоро заканчивается подписка на канал <b>{safe_title}</b>",
                         reply_markup=build_reminder_keyboard(channel_key),
                         parse_mode="HTML"
                     )
-
-
-                elif today >= expire_date:
+                elif today >= (expire_date + timedelta(days=2)):
+                    # Сообщение пользователю
                     await bot.send_message(
                         chat_id=user_id,
-                        text=(
-                            "❌ Мы не получили оплату. "
-                            f"Доступ к каналу {safe_title}\n"
-                            "будет приостановлен 😢\n"
-                            "❤️ Мы ждём тебя обратно!"
-                        ),
-
+                        text=f"❌ Доступ к каналу {safe_title} будет приостановлен",
                         reply_markup=build_comeback_keyboard(channel_key)
                     )
 
-
-            elif next_reminder_str and status == "not_paid":
-                next_reminder = datetime.fromisoformat(next_reminder_str).date()
-                if next_reminder <= today:
-                    await bot.send_message(
-                        chat_id=user_id,
-                        text=(
-                            f"🏊‍♀️ Привет, {name}!\n"
-                            "Напоминаем о необходимости внести платёж 💰"
-                            f"по подписке {safe_title}"
-                        ),
-                        reply_markup=build_reminder_keyboard(channel_key)
+                    # Уведомление админов (используем вашу существующую функцию)
+                    admin_message = (
+                        f"⚠️ У пользователя приостановлен доступ к каналу\n"
+                        f"ID: {user_id}\n"
+                        f"Имя: {html.escape(name)}\n"
+                        f"Канал: {safe_title}\n"
+                        f"Дата окончания: {expire_date}"
                     )
 
+                    # Адаптируем вашу функцию для этого случая
+                    await notify_admin_about_access_revoked(bot, user_id, name, safe_title, expire_date)
 
         except Exception as e:
-            print(f"⚠️ Не удалось отправить пользователю {user_id}: {e}")
+            print(f"⚠️ Ошибка отправки пользователю {user_id}: {e}")
+
+
+async def notify_admin_about_access_revoked(bot, user_id: int, user_name: str, channel_title: str, expire_date):
+    """Асинхронное уведомление админа о приостановке доступа"""
+    admin_ids = get_admins_for_channel("default_channel")
+    text = (
+        f"🚫 Доступ приостановлен\n"
+        f"Пользователь: {user_name} (ID: {user_id})\n"
+        f"Канал: {channel_title}\n"
+        f"Дата окончания: {expire_date}"
+    )
+    for admin_id in admin_ids:
+        try:
+            await bot.send_message(admin_id, text)
+        except Exception as e:
+            print(f"⚠️ Ошибка отправки админу {admin_id}: {e}")
+
+
+async def notify_admin_about_come_back(bot, user_id: int, user_name: str):
+    """Асинхронное уведомление админа"""
+    admin_ids = get_admins_for_channel("default_channel")
+    text = f"🔔 Пользователь {user_name} (ID: {user_id}) нажал 'Я вернусь'"
+    for admin_id in admin_ids:
+        await bot.send_message(admin_id, text)
 
 
 def start_scheduler(bot):
+    """Запуск планировщика"""
     scheduler.add_job(
         send_reminders,
         CronTrigger(hour=11, minute=30, timezone=moscow),
         args=[bot]
     )
     scheduler.start()
-    print("✅ Планировщик запущен: каждый день в 11:30 по Москве")
-
-
-async def notify_admin_about_come_back(bot, user_id: int, user_name: str):
-    from db import get_admins_for_channel
-    admin_ids = get_admins_for_channel("your_default_channel")  # или всех админов
-    text = (
-        f"🔔 Пользователь {user_name} (ID: {user_id}) нажал 'Я вернусь' "
-        f"{7} дней назад.\n"
-        "Проверьте, вернулся ли он к оплате."
-    )
-    for admin_id in admin_ids:
-        await bot.send_message(admin_id, text)
+    print("✅ Планировщик запущен (AsyncIOScheduler)")
 
 
 def schedule_check_come_back(bot, user_id: int, user_name: str, delay_days=7):
+    """Планирование проверки возврата"""
     run_date = datetime.now() + timedelta(days=delay_days)
-
     scheduler.add_job(
         notify_admin_about_come_back,
         trigger=DateTrigger(run_date=run_date),
         args=[bot, user_id, user_name],
-        id=f"remind_come_back_{user_id}",  # уникальный id задачи
+        id=f"remind_come_back_{user_id}",
         replace_existing=True
     )

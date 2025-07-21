@@ -72,16 +72,16 @@ async def send_paid_users_page(chat, context):
         await chat.send_message(
             card,
             parse_mode="HTML",
-            # reply_markup=build_user_cancel_button(user_id, channel_key)
+            reply_markup=build_user_cancel_button(user_id, channel_key)
         )
 
         # Кнопки навигации
         # И добавь кнопку навигации в конце
-        nav_markup = InlineKeyboardMarkup([[
-            InlineKeyboardButton("⬅️ Назад", callback_data="paid_page:prev"),
-            InlineKeyboardButton("➡️ Вперёд", callback_data="paid_page:next"),
-        ]])
-        await chat.send_message("📄 Навигация:", reply_markup=nav_markup)
+    nav_markup = InlineKeyboardMarkup([[
+        InlineKeyboardButton("⬅️ Назад", callback_data="paid_page:prev"),
+        InlineKeyboardButton("➡️ Вперёд", callback_data="paid_page:next"),
+    ]])
+    await chat.send_message("📄 Навигация:", reply_markup=nav_markup)
 
 
 async def send_unpaid_users_page(chat, context):
@@ -105,8 +105,9 @@ async def send_unpaid_users_page(chat, context):
         await chat.send_message(
             text=text,
             parse_mode="HTML",
-            # reply_markup=build_user_confirm_button(user_id, channel_key)
+            reply_markup=build_user_confirm_button(user_id, channel_key)
         )
+
 
     # И добавь кнопку навигации в конце
     nav_markup = InlineKeyboardMarkup([[
