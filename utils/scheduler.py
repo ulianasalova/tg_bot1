@@ -30,6 +30,7 @@ async def send_reminders(bot):
                 payment_date = datetime.fromisoformat(next_reminder_str).date()
                 remind_date = payment_date - timedelta(days=2)
                 expire_date = payment_date + timedelta(days=1)
+                expire_date2 = expire_date + timedelta(days=1)
 
                 if remind_date <= today < expire_date:
                     await bot.send_message(
@@ -39,8 +40,7 @@ async def send_reminders(bot):
                         parse_mode="HTML"
                     )
                     await asyncio.sleep(0.1)
-                elif today >= expire_date + timedelta(days=1):
-                    # Сообщение пользователю
+                elif expire_date < today <= expire_date2:                    # Сообщение пользователю
                     await bot.send_message(
                         chat_id=user_id,
                         text=f"❌ Доступ к каналу {safe_title} будет приостановлен",
