@@ -321,18 +321,12 @@ def get_admin_by_id(admin_id: int):
         "payment_details": row[4],  # ✅ добавляем!
         "channels": channels
     }
-
     return admin
 
-
-
-import logging
-logger = logging.getLogger(__name__)
 def get_admins_for_channel(channel_key: str) -> list[int]:
+    print(f"[DEBUG] Запрос админов для channel_key: '{channel_key}' (тип: {type(channel_key)})")
     conn = sqlite3.connect(DB_NAME)
     c = conn.cursor()
-
-    logger.debug(f"Запрос админов для канала: {channel_key}")
 
     c.execute("""
         SELECT a.id
@@ -345,10 +339,10 @@ def get_admins_for_channel(channel_key: str) -> list[int]:
     conn.close()
 
     admin_ids = [row[0] for row in rows]
-    logger.info(f"Найдено {len(admin_ids)} админов для канала '{channel_key}': {admin_ids}")
-
 
     return admin_ids
+    print(f"[DEBUG] Результат: {result}")  # Логируем результат
+    return result
 
 def is_admin(user_id: int) -> bool:
     admin = get_admin_by_id(user_id)
@@ -397,7 +391,7 @@ def get_all_users():
     c = conn.cursor()
 
     c.execute("""
-    SELECT 
+    SELECT
         u.id,
         u.name,
         uc.payment_status,
@@ -408,6 +402,7 @@ def get_all_users():
     FROM users u
     JOIN user_channels uc ON u.id = uc.user_id
     JOIN channels c ON uc.channel_key = c.key
+    WHERE uc.payment_status != 'not_paid'
     """)
 
     result = c.fetchall()
