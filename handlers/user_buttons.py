@@ -140,7 +140,6 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
             return
 
         name = user_data["name"]
-        username = user_data["username"]
         channels = user_data["subscriptions"]
 
         if not channels:
@@ -153,9 +152,8 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
         message_lines = [f"📄 <b>Подписки пользователя {name}</b> (ID: <code>{user_id}</code>):\n"]
         for ch in channels:
             channel_key = ch["channel_key"]
+            next_reminder_date = ch["next_reminder_date"]
             payment_date = ch["payment_date"]
-            previous_date = ch["previous_payment_date"]
-
             channel_info = fetch_channels().get(channel_key)
             channel_title = channel_info["title"] if channel_info else channel_key
 
