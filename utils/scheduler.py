@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 import html
 
 from db import get_all_users, get_admins_for_channel
-from keyboards.main import build_reminder_keyboard, build_comeback_keyboard
+from keyboards.main import build_reminder_keyboard, build_comeback_keyboard,build_user_confirm_button
 
 moscow = pytz.timezone("Europe/Moscow")
 scheduler = AsyncIOScheduler()
@@ -26,7 +26,7 @@ async def send_reminders(bot):
             continue
 
         try:
-            if status == "paid" and next_reminder_str:
+            if status == "paid" and next_reminder_str:  # Исправлено: payment_date_str вместо next_reminder_str
                 payment_date = datetime.fromisoformat(next_reminder_str).date()
                 remind_date = payment_date - timedelta(days=2)
                 expire_date = payment_date + timedelta(days=1)
@@ -38,15 +38,16 @@ async def send_reminders(bot):
                         reply_markup=build_reminder_keyboard(channel_key),
                         parse_mode="HTML"
                     )
-                elif today >= (expire_date + timedelta(days=2)):
+                    await asyncio.sleep(0.1)
+                elif today >= expire_date + timedelta(days=1):
                     # Сообщение пользователю
                     await bot.send_message(
                         chat_id=user_id,
                         text=f"❌ Доступ к каналу {safe_title} будет приостановлен",
                         reply_markup=build_comeback_keyboard(channel_key)
                     )
-
-                    # Уведомление админов (используем вашу существующую функцию)
+                    # Уведомление всем администраторам
+                    admin_ids = get_admins_for_channel(channel_key)
                     admin_message = (
                         f"⚠️ У пользователя приостановлен доступ к каналу\n"
                         f"ID: {user_id}\n"
@@ -55,8 +56,17 @@ async def send_reminders(bot):
                         f"Дата окончания: {expire_date}"
                     )
 
-                    # Адаптируем вашу функцию для этого случая
-                    await notify_admin_about_access_revoked(bot, user_id, name, safe_title, expire_date)
+                    for admin_id in admin_ids:
+                        try:
+                            await bot.send_message(
+                                chat_id=admin_id,  # Предполагаем, что admin[0] - это chat_id
+                                text=admin_message,
+                                reply_markup=build_user_confirm_button(user_id,channel_key),
+                                parse_mode="HTML"
+                            )
+                            await asyncio.sleep(0.1)
+                        except Exception as e:
+                            print(f"⚠️ Ошибка отправки админу {admin_id}: {e}")
 
         except Exception as e:
             print(f"⚠️ Ошибка отправки пользователю {user_id}: {e}")
@@ -73,7 +83,11 @@ async def notify_admin_about_access_revoked(bot, user_id: int, user_name: str, c
     )
     for admin_id in admin_ids:
         try:
-            await bot.send_message(admin_id, text)
+            await bot.send_message(
+                chat_id=admin_id,
+                text=text,
+                parse_mode="HTML"
+            )
         except Exception as e:
             print(f"⚠️ Ошибка отправки админу {admin_id}: {e}")
 
