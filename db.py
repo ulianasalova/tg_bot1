@@ -652,7 +652,7 @@ def get_users_pending_confirmation():
     c = conn.cursor()
 
     c.execute("""
-        SELECT 
+        SELECT
             uc.user_id,
             u.name,
             u.username,
@@ -660,16 +660,21 @@ def get_users_pending_confirmation():
             uc.payment_date
         FROM user_channels uc
         JOIN users u ON u.id = uc.user_id
-        LEFT JOIN (
-            SELECT * 
-            FROM payment_log
-            WHERE id IN (
-                SELECT MAX(id)
-                FROM payment_log
-                GROUP BY user_id, channel_key
-            )
-        ) pl ON pl.user_id = uc.user_id AND pl.channel_key = uc.channel_key
-        WHERE (pl.action IS NULL)
+        WHERE uc.payment_status = 'paid'
+          AND uc.payment_date IS NOT NULL
+          AND EXISTS (
+            SELECT 1
+            FROM payment_log pl
+            WHERE pl.user_id = uc.user_id
+              AND pl.channel_key = uc.channel_key
+              AND pl.id = (
+                  SELECT MAX(id)
+                  FROM payment_log
+                  WHERE user_id = uc.user_id
+                    AND channel_key = uc.channel_key
+              )
+              AND pl.action IS NULL
+          )
     """)
 
     results = c.fetchall()
