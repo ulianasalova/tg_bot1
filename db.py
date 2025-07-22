@@ -477,9 +477,9 @@ def get_user_by_id(user_id: int):
 
     # Получаем подписки
     c.execute("""
-        SELECT channel_key, payment_date, previous_payment_date
+        SELECT channel_key, payment_date, next_reminder_date
         FROM user_channels
-        WHERE user_id = ?
+        WHERE user_id = ? AND payment_status != 'not_paid'
     """, (user_id,))
     subscriptions = c.fetchall()
 
@@ -493,7 +493,7 @@ def get_user_by_id(user_id: int):
             {
                 "channel_key": sub[0],
                 "payment_date": sub[1],
-                "previous_payment_date": sub[2]
+                "next_reminder_date": sub[2]
             } for sub in subscriptions
         ]
     }
