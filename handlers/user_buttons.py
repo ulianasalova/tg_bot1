@@ -79,6 +79,9 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
     # 🔹 Оплата по выбранному каналу
     elif data.startswith("pay_channel:"):
         channel_key = data.split(":")[1]
+        from db import add_user_channel
+        add_user_channel(user.id, channel_key)
+
 
         if channel_key == "swimmasters":
             channel = fetch_channels()[channel_key]  # Получаем данные канала
@@ -248,12 +251,11 @@ async def handle_user_buttons(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     elif data.startswith("set_channel:"):
         channel_key = data.split(":")[1]
+        channel = fetch_channels()[channel_key]
         if channel_key not in fetch_channels():
             await query.answer("❌ Канал не найден", show_alert=True)
             return
-        from db import add_user_channel
-        add_user_channel(user.id, channel_key)
-        channel = fetch_channels()[channel_key]
+
         if channel_key == "swimmasters":
             await query.edit_message_text(
                 f"✅ Вы выбрали канал:\n<b>{channel['title']}</b>\n"
