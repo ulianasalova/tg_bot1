@@ -140,9 +140,40 @@ def add_user(user_id, name, username=None):
     conn.commit()
     conn.close()
 
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import sqlite3
 
+
+import logging
+
+# Настройка логирования
+logging.basicConfig(
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    level=logging.DEBUG  # Включаем DEBUG для SQL-запросов
+)
+logger = logging.getLogger(__name__)
+
+
+def log_execute(cursor, query, params=None):
+    """Обёртка для логирования SQL-запросов с параметрами"""
+    try:
+        # Форматируем запрос для лога (только для отладки!)
+        if params:
+            debug_query = query
+            for param in params:
+                if param is None:
+                    debug_query = debug_query.replace('?', 'NULL', 1)
+                elif isinstance(param, str):
+                    debug_query = debug_query.replace('?', f"'{param}'", 1)
+                else:
+                    debug_query = debug_query.replace('?', str(param), 1)
+            logger.debug(f"🔍 SQL:\n{debug_query}")
+
+        # Выполняем оригинальный запрос
+        return cursor.execute(query, params) if params else cursor.execute(query)
+    except Exception as e:
+        logger.error(f"❌ Ошибка в запросе: {query}\nПараметры: {params}")
+        raise
 
 def mark_as_paid_custom(
         user_id: int,
