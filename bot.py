@@ -40,7 +40,7 @@ async def create_telegram_app():
     """Создание и инициализация Telegram приложения"""
     app = ApplicationBuilder().token(config.BOT_TOKEN).build()
     await app.initialize()
-    # await app.start()
+    await app.start()
     return app
 
 async def on_startup(app: web.Application):
@@ -135,15 +135,17 @@ def setup_handlers(app):
                                          pattern=r"^(paid_page|unpaid_page|history_page):(prev|next)$"))
     app.add_handler(CallbackQueryHandler(message_user_callback, pattern=r"^message_user:\d+$"))
 
+    # Командные обработчики
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("update_pay", handle_update_pay_command))
+
     # Обработчики сообщений
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, send_text_to_user))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name_input))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_date_input))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_buttons))
 
-    # Командные обработчики
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("update_pay", handle_update_pay_command))
+
 
     # Добавляем admin handlers
     for handler in get_admin_handlers():
