@@ -290,7 +290,15 @@ async def handle_admin_buttons(update: Update, context: ContextTypes.DEFAULT_TYP
         from collections import defaultdict
         users = get_all_users_with_channels()
         total = len(users)
-        paid = len([u for u in users if u["payment_status"] == "paid"])
+        current_date = datetime.now().date()
+        paid_users = [
+            u for u in users
+            if u["payment_status"] == "paid" and
+               u["payment_date"] and
+               (datetime.strptime(u["payment_date"], '%Y-%m-%d').date() + timedelta(days=30)) > current_date
+        ]
+
+        paid = len(paid_users)
         not_paid = total - paid
         percent = round((paid / total) * 100, 1) if total > 0 else 0
         # 🔹 Последняя оплата
@@ -325,7 +333,7 @@ async def handle_admin_buttons(update: Update, context: ContextTypes.DEFAULT_TYP
             channel_lines += (
                 f"\n🏷 <b>{title}</b>:\n"
                 f"— всего: <b>{stats['total']}</b>\n"
-                f"— оплатили: <b>{stats['paid']}</b>\n"
+                f"— оплачено: <b>{stats['paid']}</b>\n"
             )
         await query.message.reply_text(
             text=(
