@@ -21,9 +21,10 @@ def build_paid_button(channel_key=None):
 
 def build_user_confirm_button(user_id: int, channel_key: str):
     return InlineKeyboardMarkup([
-        [InlineKeyboardButton("✅ Подтвердить оплату", callback_data=f"admin_confirm:{user_id}:{channel_key}")],
+        [InlineKeyboardButton("✅ Подтвердить оплату(текущая дата)", callback_data=f"admin_confirm:{user_id}:{channel_key}")],
         [InlineKeyboardButton("✉️ Написать", callback_data=f"message_user:{user_id}")]
     ])
+
 
 def build_comeback_keyboard(channel_key: str):
     return InlineKeyboardMarkup([
