@@ -32,40 +32,144 @@ async def handle_admin_buttons(update: Update, context: ContextTypes.DEFAULT_TYP
         await send_paid_users_page(query.message, context)
 
 
+
     elif data == "admin_view:to_confirm":
+
         from db import get_users_pending_confirmation
+
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
         users = get_users_pending_confirmation()
 
         if not users:
             await query.edit_message_text("📭 Нет оплат, ожидающих подтверждения.")
+
             return
+
         await query.edit_message_text("🧾 Список оплат, ожидающих подтверждения:")
+
         for user in users:
             user_id, name, username, channel_key, payment_date = user
+
             channel_title = fetch_channels().get(channel_key, {}).get("title", channel_key)
+
             username_str = f"@{username}" if username else "(без username)"
+
             text = (
+
                 f"👤 <b>{name}</b> {username_str} (ID: <code>{user_id}</code>)\n"
+
                 f"📌 Канал: <b>{channel_title}</b>\n"
+
                 f"📅 Дата оплаты: {payment_date}\n"
+
                 f"💳 Статус: <b>Ожидает подтверждения</b>"
+
             )
+
             keyboard = InlineKeyboardMarkup([
+
                 [
-                    InlineKeyboardButton("✅ Подтвердить", callback_data=f"admin_confirm:{user_id}:{channel_key}"),
-                    InlineKeyboardButton("↩ Отменить", callback_data=f"admin_cancel:{user_id}:{channel_key}")
+
+                    InlineKeyboardButton(
+
+                        "✅ Подтвердить оплату",
+
+                        callback_data=f"admin_confirm_pending:{user_id}:{channel_key}:{payment_date}"
+
+                    ),
+
+                    InlineKeyboardButton(
+
+                        "↩ Отменить",
+
+                        callback_data=f"admin_cancel:{user_id}:{channel_key}"
+
+                    )
+
                 ],
+
                 [
-                    InlineKeyboardButton("📜 История", callback_data=f"user_log:{user_id}")
+
+                    InlineKeyboardButton(
+
+                        "✉️ Написать",
+
+                        callback_data=f"message_user:{user_id}"
+
+                    )
+
                 ]
+
             ])
+
             await context.bot.send_message(
+
                 chat_id=query.from_user.id,
+
                 text=text,
+
                 parse_mode="HTML",
+
                 reply_markup=keyboard
+
             )
+
+    elif data.startswith("admin_confirm_pending:"):
+        if not is_admin(query.from_user.id):
+            await query.answer("⛔ Только админ может это подтвердить.", show_alert=True)
+            return
+
+        # Извлекаем user_id, channel_key И payment_date
+        parts = data.split(":")
+        if len(parts) < 4:  # Теперь ожидаем 4 части
+            await query.answer("⚠️ Неверный формат данных", show_alert=True)
+            return
+
+        confirmed_user_id = int(parts[1])
+        channel_key = parts[2]
+        payment_date = parts[3]  # Получаем дату из callback_data
+
+        # ✅ Подтверждаем оплату с переданной датой
+        mark_as_paid_custom(
+            user_id=confirmed_user_id,
+            channel_key=channel_key,
+            payment_date=payment_date,  # Используем переданную дату вместо текущей
+            admin_id=query.from_user.id,
+            action="confirmed"
+        )
+        # ⬇️ Новое: уведомляем пользователя
+        channel_info = fetch_channels().get(channel_key)
+        channel_title = channel_info["title"] if channel_info else channel_key
+
+        try:
+            await context.bot.send_message(
+                chat_id=confirmed_user_id,
+                text=(
+                    f"✅ Ваша подписка на канал <b>{channel_title}</b> подтверждена администратором.\n"
+                    f"Приятного пользования! 🎉"
+                ),
+                parse_mode="HTML"
+            )
+        except Exception as e:
+            logger.warning(f"Не удалось уведомить пользователя {confirmed_user_id}: {e}")
+        # Получаем Telegram имя
+        try:
+            user = await context.bot.get_chat(confirmed_user_id)
+            username = f"@{user.username}" if user.username else "(без username)"
+            full_name = f"{username} ({user.first_name})"
+        except Exception as e:
+            logger.warning(f"Ошибка при получении имени пользователя: {e}")
+            full_name = f"ID {confirmed_user_id}"
+
+        await query.edit_message_text(
+            f"✅ Подтверждена оплата от пользователя {full_name} по каналу: <b>{channel_key}</b>",
+            parse_mode="HTML"
+        )
+        # Изменим клавиатуру у этого сообщения
+        await query.edit_message_reply_markup(
+            reply_markup=build_history_keyboard(confirmed_user_id, "paid", channel_key)
+        )
 
     elif data.startswith("admin_confirm:"):
         if not is_admin(query.from_user.id):
@@ -371,6 +475,7 @@ async def message_user_callback(update: Update, context: ContextTypes.DEFAULT_TY
         chat_id=query.from_user.id,
         text=f"Введите сообщение, которое хотите отправить пользователю (ID: {target_user_id}):"
     )
+
 async def send_text_to_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
     target_user_id = context.user_data.pop("target_user_id", None)
 
