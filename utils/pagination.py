@@ -101,9 +101,11 @@ async def send_unpaid_users_page(chat, context):
         return
 
     for user_id, name, status, username, channel_key, payment_date in page_users:
-        text = format_user_card_simple(user_id, name, username, channel_key, payment_date)
+        main_text = format_user_card_simple(user_id, name, username, channel_key, payment_date)
+        full_text = f"{main_text}\n\nℹ️ Или напишите /update_pay чтобы изменить дату"
+
         await chat.send_message(
-            text=text,
+            text=full_text,
             parse_mode="HTML",
             reply_markup=build_user_confirm_button(user_id, channel_key)
         )
