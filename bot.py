@@ -140,10 +140,10 @@ def setup_handlers(app):
     app.add_handler(CommandHandler("update_pay", handle_update_pay_command))
 
     # Обработчики сообщений
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, send_text_to_user))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name_input))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_date_input))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text_buttons))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, send_text_to_user))
 
 
 
